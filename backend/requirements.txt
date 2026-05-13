@@ -17,7 +17,7 @@ APScheduler==3.10.4
 
 # ── OCR ───────────────────────────────────────
 pytesseract==0.3.10
-Pillow==10.3.0
+Pillow==11.2.1
 
 # ── MULTIPART (dosya upload) ──────────────────
 python-multipart==0.0.9
