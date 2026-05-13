@@ -6,7 +6,7 @@ Fincan Kahve — Seed Data
 import random
 from datetime import datetime, timedelta
 from database import SessionLocal, engine, Base
-from models import Customer, Product, Order, OrderItem, Shipment
+from models import Customer, Product, Order, OrderItem, Shipment, AIInsight, NotificationLog
 
 Base.metadata.create_all(bind=engine)
 
@@ -134,7 +134,6 @@ def seed(force: bool = False):
                 force = True
 
         if force:
-            from models import OrderItem, Shipment, AIInsight, NotificationLog
             db.query(OrderItem).delete()
             db.query(Shipment).delete()
             db.query(Order).delete()
