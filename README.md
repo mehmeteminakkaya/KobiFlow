@@ -222,4 +222,9 @@ Video'da gösterilen akış:
 
 ## 👤 Geliştirici
 
-**YZTA 5.0 — AI Geliştirme Hackathon**
+**Mehmet Emin Akkaya**
+- Portfolio: [mehmeteminakkaya.com](https://mehmeteminakkaya.com)
+- GitHub: [@mehmeteminakkaya](https://github.com/mehmeteminakkaya)
+- LinkedIn: [in/mehmeteminakkaya](https://www.linkedin.com/in/mehmeteminakkaya/)
+- Hackathon: YZTA 5.0 — AI Geliştirme Hackathon
+
