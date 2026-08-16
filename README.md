@@ -1,230 +1,158 @@
-# Nexus — KOBİ Operasyon Asistanı
+<div align="center">
 
-> YZTA 5.0 AI Hackathon — AI Geliştirme Kategorisi
+# 🤖 Nexus AI — KOBİ Operasyon & Finans Asistanı
 
-KOBİ'lerin günlük operasyonlarını doğal dil üzerinden yönetmelerine olanak tanıyan, yapay zeka destekli operasyon merkezi. İşletme yöneticisi Türkçe konuşur, sistem hem yanıt verir hem aksiyon alır.
+[![Google Hackathon Finalist](https://img.shields.io/badge/YZTA%205.0-Hackathon%20Finalist-gold?style=for-the-badge&logo=google&logoColor=white)](https://github.com/mehmeteminakkaya/Nexus-Proje)
+[![Backend](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.11-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Frontend](https://img.shields.io/badge/Frontend-React%20%7C%20Vite%20%7C%20Tailwind-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![AI Models](https://img.shields.io/badge/AI%20Engine-NVIDIA%20NIM%20%7C%20Mistral%20%7C%20Llama%203.3-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://build.nvidia.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+<p align="center">
+  <strong>KOBİ'lerin günlük operasyonlarını ve finansal kararlarını otonomlaştıran yapay zekâ asistanı.</strong><br>
+  Yönetici Türkçe konuşur; Nexus sorgular, analiz eder, faturaları OCR ile okur ve anında aksiyon alır.
+</p>
+
+[Canlı Demo](#-demo) • [Sistem Mimarisi](#%EF%B8%8F-sistem-mimarisi) • [Hızlı Kurulum](#-h%C4%B1zl%C4%B1-kurulum) • [Geliştirici](#-geli%C5%9Ftirici)
 
 ---
 
-## 🎯 Problem
+</div>
 
-Küçük işletmeler günde 2–3 saatini "siparişim nerede?", "stokta ne kaldı?" gibi tekrar eden operasyonel sorulara harcıyor. Bu süre müşteri kaybına, stok tükenmesine ve ölçekleme güçlüğüne dönüşüyor.
+## 🎯 Problem & Çözüm
 
-## 💡 Çözüm
+Küçük ve orta ölçekli işletmeler (KOBİ) her gün 2-3 saatini "Hangi sipariş gecikti?", "Kritik stokta ne kaldı?", "Faturadaki ürünleri stoka nasıl işlerim?" gibi operasyonel işlere harcıyor.
 
-Doğal dil ile iletişim kurulan, gerçek aksiyonlar alabilen AI asistanı:
+**Nexus AI**, tüm bu süreci tek bir doğal dil arayüzüne indirger:
 
-```
-"Bugün kaç sipariş var?"         → Anlık sipariş listesi
-"Kritik stokta ne var?"          → Uyarı verir
-"128 numaralı siparişi iptal et" → Gerçekten günceller
-"Bu hafta en çok ne sattık?"     → Analiz + grafik
+```text
+🗣️ "Bugün kaç sipariş var?"         ➔ Anlık sipariş listesi & özet
+⚠️ "Kritik stokta ne var?"          ➔ Tükenme riski olan ürünler ve tahmin günü
+🔄 "128 nolu siparişi iptal et"     ➔ Veritabanını anında günceller
+🧾 [Fatura Görseli Yükle]           ➔ OCR ile satırları okur, stoka otomatik işler
+📊 "Bu hafta en çok ne sattık?"     ➔ Anlık analiz, ciro grafiği ve trend raporu
 ```
 
 ---
 
 ## 🏗️ Sistem Mimarisi
 
+```mermaid
+graph TD
+    User([Kullanıcı / KOBİ Yöneticisi]) <-->|WebSocket + REST| Frontend[React + Vite Dashboard]
+    
+    subgraph "FastAPI Asenkron Backend"
+        Router[FastAPI API Router]
+        Auth[JWT Kimlik Doğrulama]
+        Agent[AI Agent Pre-fetch Engine]
+        Insight[APScheduler Proaktif Motor]
+        OCR[Tesseract OCR + Vision Engine]
+        RAG[LangChain + FAISS Vektör Belleği]
+        Sim[Gerçek Zamanlı Sipariş Simülatörü]
+        
+        Router --> Auth
+        Router --> Agent
+        Router --> Insight
+        Router --> OCR
+        Router --> RAG
+        Router --> Sim
+    end
+
+    subgraph "Veri & Model Katmanı"
+        DB[(SQLite / PostgreSQL via SQLAlchemy)]
+        NvidiaAPI[NVIDIA NIM: Mistral Nemo 12B & Llama 3.3 70B]
+    end
+
+    Agent <--> NvidiaAPI
+    Agent <--> DB
+    Insight <--> DB
+    Insight -->|Anlık Push| Frontend
+    OCR --> DB
 ```
-┌─────────────────────────────────────────────────────┐
-│                   KULLANICI (React)                  │
-│         Chat Arayüzü  │  Dashboard  │  WebSocket     │
-└──────────────────────────────────────────────────────┘
-                         │ REST + WebSocket
-┌──────────────────────────────────────────────────────┐
-│                 FastAPI Backend (Python)              │
-│                                                      │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐  │
-│  │  AI Agent   │  │ Insight      │  │  Auth      │  │
-│  │  (Pre-fetch │  │ Engine       │  │  (JWT)     │  │
-│  │  + LLM)     │  │ (APScheduler)│  │            │  │
-│  └──────┬──────┘  └──────────────┘  └────────────┘  │
-│         │                                            │
-│  ┌──────┴──────────────────────────────────────┐    │
-│  │          Tool Executor (9 araç)              │    │
-│  │  get_orders │ get_stock │ update_order │ ... │    │
-│  └──────┬──────────────────────────────────────┘    │
-│         │                                            │
-│  ┌──────┴──────┐  ┌──────────┐  ┌───────────────┐  │
-│  │   SQLite    │  │  FAISS   │  │  OCR Service  │  │
-│  │ (SQLAlchemy)│  │  (RAG)   │  │  (Tesseract)  │  │
-│  └─────────────┘  └──────────┘  └───────────────┘  │
-└──────────────────────────────────────────────────────┘
-                         │
-┌──────────────────────────────────────────────────────┐
-│              NVIDIA NIM (LLM API)                    │
-│    mistralai/mistral-nemo-12b-instruct (Ana model)   │
-│    meta/llama-3.3-70b-instruct (RAG için)            │
-│    nvidia/nv-embedqa-e5-v5 (Embedding)               │
-└──────────────────────────────────────────────────────┘
+
+---
+
+## ✨ Öne Çıkan Özellikler
+
+| Modül | Özellik | Açıklama |
+| :--- | :--- | :--- |
+| 💬 **AI Operasyon Chat** | Doğal Dil Arayüzü | Sipariş, stok, müşteri sorgularında streaming Türkçe yanıt |
+| 📊 **Canlı Dashboard** | Finans & Ciro | Anlık özet: bekleyen siparişler, kritik stoklar, günlük ciro |
+| 🔔 **Proaktif AI Motoru** | APScheduler | 5 dakikada bir otomatik stok ve gecikme analizi üretir |
+| 🧾 **Otomatik Fatura OCR** | Vision + Tesseract | Fatura görselindeki kalemleri okuyup tek tıkla stoka işler |
+| 📈 **Akıllı Stok Tahmini** | Trend Algoritması | Son 30 günlük satış trendine göre tükenme gününü hesaplar |
+| ⚡ **Canlı Simülasyon** | Real-time Engine | 90 saniyede bir gerçekçi kargo ve sipariş hareketleri simüle eder |
+| 🔐 **Güvenlik & Rol** | JWT Auth | Token tabanlı yönetici ve personel yetkilendirmesi |
+
+---
+
+## 🚀 Hızlı Kurulum
+
+### Ön Koşullar
+* Python 3.10+
+* Node.js 18+
+* [NVIDIA NIM API Key](https://build.nvidia.com/)
+* *(Opsiyonel)* Windows için [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
+
+### 1. Tek Tıkla Başlatma (Windows)
+```cmd
+# Depo kökündeki başlatıcıyı çalıştırın:
+baslat.bat
 ```
 
----
+### 2. Manuel Kurulum Adımları
 
-## 🤖 Yapay Zeka Yaklaşımı
-
-### Pre-fetch Strategy (Tool Calling yerine)
-Klasik function calling yerine **keyword tabanlı pre-fetch** kullandık:
-1. Kullanıcı mesajı anahtar kelimeler açısından analiz edilir
-2. İlgili veriler DB'den **tek sorguda** çekilir
-3. Veri + mesaj birlikte LLM'e gönderilir → tek API çağrısı
-
-**Neden?** Daha az gecikme, daha güvenilir sonuç, daha az hata.
-
-### Neden NVIDIA NIM API? (Gemini yerine)
-Hackathon'da Gemini önerilmekle birlikte, NVIDIA NIM tercih edilmiştir. Gerekçeler:
-- **Ücretsiz kullanım limiti:** NVIDIA NIM API ücretsiz katmanı prototipleme için yeterli kotayı sunmaktadır.
-- **Model çeşitliliği:** Tek platform üzerinden chat (Mistral Nemo 12B), RAG (Llama 3.3 70B) ve embedding (NV-EmbedQA E5) modellerine erişim sağlanmıştır.
-- **OpenAI uyumlu SDK:** `openai` Python SDK'sı ile çalıştığı için ileride Gemini veya başka bir sağlayıcıya geçiş tek satır değişiklikle mümkündür.
-
-### Proaktif AI Engine
-APScheduler ile her 5 dakikada arka planda çalışır:
-- Kritik stok tespiti → otomatik `AIInsight` üretir
-- Geciken sipariş tespiti → yöneticiye bildirim
-- Kargo gecikme riski tespiti → önceden uyarı
-- WebSocket ile anlık push notification
-
-### RAG (Retrieval-Augmented Generation)
-LangChain + FAISS ile belge hafızası:
-- PDF, DOCX, XLSX, TXT destekli
-- Çok dilli embedding (Türkçe/İngilizce)
-- İşletmenin kendi belgelerine soru sormak için
-
-### Stok Tahmin Motoru
-- Son 30 günlük satış verisi + son 7 günlük trend
-- Her ürün için tahmini tükenme günü hesaplama
-- Risk seviyesi: `critical` / `warning` / `safe`
-
----
-
-## ✨ Özellikler
-
-| Özellik | Açıklama |
-|---------|----------|
-| 💬 AI Chat | Doğal dil ile sipariş, stok, müşteri sorguları — streaming yanıt |
-| 📊 Dashboard | Anlık özet: bekleyen siparişler, kritik stoklar, günlük ciro |
-| 📈 Analitik | Gelir trendi, kategori bazlı ciro, en çok satan ürünler |
-| 🔔 Proaktif İçgörüler | AI'ın her 5 dakikada ürettiği stok/gecikme/trend uyarıları |
-| 📦 Sipariş Yönetimi | Sipariş listesi, durum güncelleme, kargo takibi |
-| 🗄️ Stok Yönetimi | Ürün stok durumu, kritik eşik uyarıları, stok güncelleme |
-| 🧾 OCR Tarama | Fatura görüntüsünden ürün verisi çıkarma → stoka otomatik işleme |
-| ⚡ Canlı Simülasyon | Her 90 saniyede gerçek zamanlı sipariş/kargo güncellemesi |
-| 🔄 WebSocket | Anlık push bildirimler, dashboard canlı güncelleme |
-| 🔐 JWT Auth | Token tabanlı kimlik doğrulama, rol yönetimi |
-
----
-
-## 🚀 Kurulum
-
-### Gereksinimler
-- Python 3.10+
-- Node.js 18+
-- NVIDIA NIM API Key ([alın](https://build.nvidia.com/))
-- **Tesseract OCR (Windows İçin):** Fatura tarama özelliğinin çalışması için [buradan](https://github.com/UB-Mannheim/tesseract/wiki) indirin ve `C:\Program Files\Tesseract-OCR\` dizinine kurun. Kurarken "Additional script data" → "Turkish" seçeneğini işaretlemeyi unutmayın.
-
-### Backend
-
+#### Backend Kurulumu:
 ```bash
 cd backend
-
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # Mac/Linux
+venv\Scripts\activate      # Windows: venv\Scripts\activate (Mac/Linux: source venv/bin/activate)
 
 pip install -r requirements.txt
 
 cp .env.example .env
-# .env dosyasını düzenle: NVIDIA_API_KEY ve JWT_SECRET ekle
+# .env dosyasına NVIDIA_API_KEY ve JWT_SECRET değerlerinizi girin
 
 python main.py
-# → http://localhost:8000
+# ➔ Backend http://localhost:8000 adresinde ayağa kalkar.
 ```
 
-### Frontend
-
+#### Frontend Kurulumu:
 ```bash
 cd frontend
 npm install
 npm run dev
-# → http://localhost:5173
+# ➔ Frontend http://localhost:5173 adresinde açılır.
 ```
 
-### İlk Giriş
-
-```
-Kullanıcı: admin
-Şifre:     admin123
-```
-
-İlk başlatmada demo verileri (8 müşteri, 32 ürün, 100 sipariş) otomatik yüklenir.
+#### 🔑 Varsayılan Giriş Bilgileri:
+* **Kullanıcı Adı:** `admin`
+* **Şifre:** `admin123`
+*(İlk açılışta 8 müşteri, 32 ürün ve 100 siparişlik demo verisi otomatik oluşturulur).*
 
 ---
 
-## 📁 Proje Yapısı
+## 🛠️ Teknoloji Yığını
 
-```
-kobi-asistan/
-├── backend/
-│   ├── main.py              # FastAPI uygulaması + tüm endpoint'ler
-│   ├── agent.py             # AI agent (pre-fetch + LLM)
-│   ├── tools.py             # Tool tanımları (9 araç)
-│   ├── tool_executor.py     # DB operasyonları
-│   ├── models.py            # SQLAlchemy modelleri
-│   ├── database.py          # DB bağlantısı
-│   ├── seed_data.py         # Demo veri yükleyici
-│   ├── auth.py              # JWT kimlik doğrulama
-│   ├── insight_engine.py    # Proaktif AI motoru
-│   ├── prediction.py        # Stok tahmin motoru
-│   ├── simulation.py        # Gerçek zamanlı sipariş/kargo simülasyonu
-│   ├── ocr_service.py       # Fatura OCR (Tesseract + Vision LLM)
-│   ├── websocket_manager.py # WebSocket yönetimi
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   └── src/
-│       ├── App.jsx          # Ana uygulama (chat + dashboard)
-│       └── index.css
-├── .gitignore
-└── README.md
-```
+* **Backend:** FastAPI, Python 3.11, SQLAlchemy, SQLite, APScheduler, LangChain, FAISS, Tesseract OCR
+* **AI & LLM:** NVIDIA NIM API (Mistral-Nemo-12B-Instruct, Llama-3.3-70B-Instruct, NV-EmbedQA-E5)
+* **Frontend:** React 18, Vite, Recharts, Tailwind CSS, Native WebSockets
+* **DevOps:** Batch scripting, Git, CORS & JWT Security
 
 ---
 
-## 🛠️ Kullanılan Teknolojiler
+## 👤 Geliştirici & İletişim
 
-**Backend:** FastAPI, Python, SQLAlchemy, SQLite, APScheduler, LangChain, FAISS, Tesseract OCR
+**Mehmet Emin Akkaya**  
+*İstinye Üniversitesi Bilgisayar Mühendisliği | Google Yapay Zeka ve Teknoloji Akademisi Bursiyeri*
 
-**AI / LLM:** NVIDIA NIM API — Mistral Nemo 12B (chat), Llama 3.1 8B (yedek)
-
-**Frontend:** React, Recharts, WebSocket
-
----
-
-## 📹 Demo
-
-[YouTube Demo Linki]
+* 🌐 **Portfolyo:** [mehmeteminakkaya.com](https://mehmeteminakkaya.com)
+* 💼 **LinkedIn:** [linkedin.com/in/mehmeteminakkaya](https://www.linkedin.com/in/mehmeteminakkaya/)
+* 🐙 **GitHub:** [@mehmeteminakkaya](https://github.com/mehmeteminakkaya)
+* 📬 **E-Posta:** [aktaha@gmail.com](mailto:aktaha@gmail.com)
 
 ---
 
-## 📹 Demo Senaryosu
-
-Video'da gösterilen akış:
-1. **Giriş:** Problem tanımı — KOBİ'ler günde 2-3 saat operasyona harcıyor
-2. **Mimari:** FastAPI + NVIDIA NIM + React tek ekran gösterimi
-3. **Canlı Demo:**
-   - AI'a "Bugün bekleyen siparişler neler?" diye sorma
-   - Kritik stok uyarısı alma
-   - Fatura fotoğrafı yükleyip OCR ile stoka işleme
-   - Doğal dille workflow oluşturma
-4. **Değer:** Sıfır insan müdahalesi, anlık bilgi, proaktif uyarılar
-
----
-
-## 👤 Geliştirici
-
-**Mehmet Emin Akkaya**
-- Portfolio: [mehmeteminakkaya.com](https://mehmeteminakkaya.com)
-- GitHub: [@mehmeteminakkaya](https://github.com/mehmeteminakkaya)
-- LinkedIn: [in/mehmeteminakkaya](https://www.linkedin.com/in/mehmeteminakkaya/)
-- Hackathon: YZTA 5.0 — AI Geliştirme Hackathon
-
+<div align="center">
+  <sub>YZTA 5.0 AI Hackathon Finalist Projesi. Telif Hakkı © 2026.</sub>
+</div>
