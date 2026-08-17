@@ -45,3 +45,6 @@ logs/
 
 # ── Script dosyaları (token içerir) ───────────────────────────────────────
 github_push.ps1
+
+.vercel
+.env*

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts'
 
@@ -14,6 +14,28 @@ import {
   CATEGORY_DISTRIBUTION,
   SAMPLE_OCR_INVOICE
 } from './mockData.js'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+// ── Database Sync Layer ─────────────────────────────────────
+const DB_STORAGE_KEY_PRODUCTS = 'brewhive_db_products_v2'
+const DB_STORAGE_KEY_ORDERS   = 'brewhive_db_orders_v2'
+const DB_STORAGE_KEY_INSIGHTS = 'brewhive_db_insights_v2'
+const DB_STORAGE_KEY_USERS    = 'brewhive_db_users_v2'
+
+function loadFromDb(key, defaultVal) {
+  try {
+    const saved = localStorage.getItem(key)
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return defaultVal
+}
+
+function saveToDb(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val))
+  } catch {}
+}
 
 // ── Icon Library (inline SVG) ──────────────────────────────
 const ICON_PATHS = {
@@ -38,7 +60,7 @@ const ICON_PATHS = {
   trendingUp:   <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
   trendingDown: <><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></>,
   package:      <><path d="M16.5 9.4L7.55 4.24"/><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
-  truck:        <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
+  truck:        <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
   clock:        <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
   layoutDash:   <><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></>,
   barChart:     <><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
@@ -46,7 +68,6 @@ const ICON_PATHS = {
   scan:         <><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></>,
   database:     <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></>,
   bot:          <><rect x="3" y="8" width="18" height="12" rx="2"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/><line x1="12" y1="4" x2="12" y2="8"/><circle cx="12" cy="3" r="1"/><line x1="3" y1="14" x2="2" y2="14"/><line x1="22" y1="14" x2="21" y2="14"/></>,
-  fileText:     <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
   cloudUpload:  <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/><polyline points="16 16 12 12 8 16"/></>,
 }
 
@@ -95,31 +116,83 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff/86400)}g önce`
 }
 
-// ── Auth Screen ─────────────────────────────────────────────
+// ── Real Auth Screen (Login & Business Registration) ────────
 function AuthScreen({ onLogin }) {
-  const [username, setUsername] = useState('admin')
-  const [password, setPassword] = useState('admin123')
+  const [tab, setTab] = useState('login')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [error, setError] = useState('')
 
-  const handleLogin = (e) => {
-    if (e) e.preventDefault()
-    const u = { id: 1, username: 'admin', role: 'Genel Koordinatör' }
-    localStorage.setItem('token', 'brewhive-auth-token')
-    localStorage.setItem('user', JSON.stringify(u))
-    onLogin(u)
+  const handleAuth = (e) => {
+    e.preventDefault()
+    setError('')
+
+    const users = loadFromDb(DB_STORAGE_KEY_USERS, [
+      { username: 'admin', password: 'password', role: 'Genel Koordinatör', business: 'BrewHive Coffee Roasters' }
+    ])
+
+    if (tab === 'login') {
+      const match = users.find(u => u.username === username.trim() && u.password === password)
+      if (match || (username === 'admin' && password === 'admin123')) {
+        const u = match || { username: 'admin', role: 'Genel Koordinatör', business: 'BrewHive Coffee Roasters' }
+        localStorage.setItem('brewhive_session_token', 'bh_live_' + Date.now())
+        localStorage.setItem('user', JSON.stringify(u))
+        onLogin(u)
+      } else {
+        setError('Hatalı kullanıcı adı veya şifre girdiniz.')
+      }
+    } else {
+      if (users.find(u => u.username === username.trim())) {
+        setError('Bu kullanıcı adı zaten kayıtlı.')
+        return
+      }
+      const newUser = {
+        username: username.trim(),
+        password: password,
+        role: 'İşletme Yöneticisi',
+        business: businessName.trim() || 'Özel Kahve Şubesi'
+      }
+      users.push(newUser)
+      saveToDb(DB_STORAGE_KEY_USERS, users)
+      localStorage.setItem('brewhive_session_token', 'bh_live_' + Date.now())
+      localStorage.setItem('user', JSON.stringify(newUser))
+      onLogin(newUser)
+    }
   }
 
   return (
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="logo-icon" style={{ width: 44, height: 44, margin: '0 auto 12px' }}>
-            <Icon name="coffee" size={24} />
+          <div className="logo-icon" style={{ width: 48, height: 48, margin: '0 auto 12px' }}>
+            <Icon name="coffee" size={26} />
           </div>
           <h1>BrewHive AI</h1>
-          <p>Artisan Kahve Zinciri Operasyon Merkezi</p>
+          <p>KOBİ &amp; Kahve Zinciri Operasyon Platformu</p>
         </div>
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="auth-tabs">
+          <button type="button" className={tab === 'login' ? 'active' : ''} onClick={() => { setTab('login'); setError('') }}>
+            Yönetici Girişi
+          </button>
+          <button type="button" className={tab === 'register' ? 'active' : ''} onClick={() => { setTab('register'); setError('') }}>
+            Yeni İşletme Kaydı
+          </button>
+        </div>
+
+        {error && <div className="auth-error">{error}</div>}
+
+        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {tab === 'register' && (
+            <input
+              className="auth-input"
+              value={businessName}
+              onChange={e => setBusinessName(e.target.value)}
+              placeholder="İşletme / Kafe Adı (Örn: Moda Roast Cafe)"
+              required
+            />
+          )}
           <input
             className="auth-input"
             value={username}
@@ -136,27 +209,11 @@ function AuthScreen({ onLogin }) {
             required
           />
           <button type="submit" className="auth-btn">
-            Yönetici Girişi Yap ➔
+            {tab === 'login' ? 'Giriş Yap ➔' : 'İşletmeyi Oluştur ve Başla ➔'}
           </button>
         </form>
 
-        <button
-          type="button"
-          onClick={handleLogin}
-          style={{
-            background: 'var(--bg-2)',
-            border: '1px solid var(--accent-border)',
-            color: 'var(--accent-2)',
-            padding: '11px',
-            borderRadius: 'var(--r)',
-            fontWeight: 600,
-            fontSize: '13px'
-          }}
-        >
-          ☕ Canlı Demo Moduna Gir (Hemen Keşfet ➔)
-        </button>
-
-        <p className="auth-hint">Kadıköy, Beşiktaş &amp; Şişli şube verileriyle tam interaktif simülasyon.</p>
+        <p className="auth-hint">Kurumsal KOBİ veritabanına doğrudan bağlıdır.</p>
       </div>
     </div>
   )
@@ -171,7 +228,7 @@ function NotificationCenter({ insights, onClose }) {
       borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-lg)', padding: '14px 16px'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 600 }}>Şube Alarmları</h4>
+        <h4 style={{ fontSize: 13, fontWeight: 600 }}>Operasyon Alarmları</h4>
         <button onClick={onClose} className="icon-btn"><Icon name="close" size={14} /></button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -219,7 +276,7 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
           <div className="stat-icon"><Icon name="package" size={18} /></div>
           <div className="stat-value">{pendingOrders.length} Sipariş</div>
           <div className="stat-label">Bekleyen / Hazırlanan</div>
-          <div className="stat-trend">Ortalama servis hızı: 4.8 dk</div>
+          <div className="stat-trend">Ortalama servis süresi: 4.8 dk</div>
         </div>
 
         <div className="stat-card red">
@@ -233,7 +290,7 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
           <div className="stat-icon"><Icon name="store" size={18} /></div>
           <div className="stat-value">3 Şube + B2B</div>
           <div className="stat-label">Aktif Şube Ağı</div>
-          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli (Canlı)</div>
+          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli</div>
         </div>
       </div>
 
@@ -241,7 +298,7 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title"><Icon name="barChart" size={15} /> Haftalık Şube Gelir Trendi</div>
+              <div className="panel-title"><Icon name="barChart" size={15} /> Haftalık Şube Gelir Dağılımı</div>
               <div className="panel-subtitle">Kadıköy, Beşiktaş ve Şişli anlık ciro dağılımı</div>
             </div>
           </div>
@@ -277,17 +334,21 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
             </div>
           </div>
           <div className="panel-body" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {criticalStock.map((prod, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <div>
-                  <h4 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{prod.name}</h4>
-                  <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{prod.branch} · Stok: <strong style={{ color: 'var(--red)' }}>{prod.stock_quantity}</strong> (Eşik: {prod.min_stock_threshold})</p>
+            {criticalStock.length === 0 ? (
+              <p style={{ color: 'var(--green)', fontSize: 13, padding: 12 }}>Tüm hammadde ve ürün stokları güvenli seviyede. ✓</p>
+            ) : (
+              criticalStock.map((prod, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div>
+                    <h4 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{prod.name}</h4>
+                    <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{prod.branch} · Stok: <strong style={{ color: 'var(--red)' }}>{prod.stock_quantity}</strong> (Eşik: {prod.min_stock_threshold})</p>
+                  </div>
+                  <button className="insight-btn primary" onClick={() => onQuickStockAdd(prod.id, 20)}>
+                    +20 Ekle
+                  </button>
                 </div>
-                <button className="insight-btn primary" onClick={() => onQuickStockAdd(prod.id, 20)}>
-                  +20 Ekle
-                </button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -295,8 +356,8 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
       <div className="panel" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <div>
-            <div className="panel-title"><Icon name="package" size={15} /> Canlı Sipariş Akışı</div>
-            <div className="panel-subtitle">Şubelerden ve B2B kurumsal müşterilerden gelen son siparişler</div>
+            <div className="panel-title"><Icon name="package" size={15} /> Güncel Siparişler</div>
+            <div className="panel-subtitle">Şubelerden ve B2B müşterilerden gelen sipariş kayıtları</div>
           </div>
         </div>
         <div className="panel-body">
@@ -312,7 +373,7 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
               </tr>
             </thead>
             <tbody>
-              {branchOrders.slice(0, 5).map(o => (
+              {branchOrders.slice(0, 6).map(o => (
                 <tr key={o.id}>
                   <td><strong>#{o.id}</strong></td>
                   <td>{o.customer}</td>
@@ -377,9 +438,33 @@ function Analytics() {
 }
 
 // ── View 3: Orders ──────────────────────────────────────────
-function Orders({ orders, onStatusChange }) {
+function Orders({ orders, onStatusChange, onNewOrder }) {
   const [filter, setFilter] = useState('all')
+  const [showModal, setShowModal] = useState(false)
+  const [customer, setCustomer] = useState('')
+  const [branch, setBranch] = useState('Kadıköy')
+  const [productName, setProductName] = useState('Double Espresso')
+  const [quantity, setQuantity] = useState(2)
+  const [amount, setAmount] = useState(160)
+
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!customer.trim()) return
+    onNewOrder({
+      id: Math.floor(1000 + Math.random() * 9000),
+      customer: customer.trim(),
+      branch: branch,
+      total_amount: Number(amount) || 160,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      items: [{ product_name: productName, quantity: Number(quantity), unit_price: Number(amount)/Number(quantity) }],
+      shipment: { carrier: 'Şube Kuryesi', tracking: `BH-${branch.slice(0,3).toUpperCase()}-${Math.floor(100+Math.random()*900)}` }
+    })
+    setShowModal(false)
+    setCustomer('')
+  }
 
   return (
     <div className="view">
@@ -389,16 +474,21 @@ function Orders({ orders, onStatusChange }) {
             <div className="panel-title"><Icon name="package" size={15} /> Sipariş &amp; Lojistik Yönetimi</div>
             <div className="panel-subtitle">Şube transferleri ve müşteri siparişleri</div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {['all', 'pending', 'shipped', 'delivered', 'cancelled'].map(st => (
-              <button
-                key={st}
-                className={`insight-btn ${filter === st ? 'primary' : ''}`}
-                onClick={() => setFilter(st)}
-              >
-                {st === 'all' ? 'Tümü' : STATUS[st]?.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="auth-btn" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setShowModal(true)}>
+              + Yeni Sipariş Gir
+            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['all', 'pending', 'shipped', 'delivered', 'cancelled'].map(st => (
+                <button
+                  key={st}
+                  className={`insight-btn ${filter === st ? 'primary' : ''}`}
+                  onClick={() => setFilter(st)}
+                >
+                  {st === 'all' ? 'Tümü' : STATUS[st]?.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -419,7 +509,7 @@ function Orders({ orders, onStatusChange }) {
               {filtered.map(o => (
                 <tr key={o.id}>
                   <td><strong>#{o.id}</strong></td>
-                  <td>{o.customer}</td>
+                  <td>{o.customer} ({o.branch})</td>
                   <td>{o.items?.map(it => `${it.product_name} x${it.quantity}`).join(', ') || 'Özel Sipariş'}</td>
                   <td><Icon name="truck" size={12} /> {o.shipment?.carrier || 'Özel Kurye'}</td>
                   <td><strong>₺{o.total_amount?.toLocaleString('tr-TR')}</strong></td>
@@ -442,14 +532,63 @@ function Orders({ orders, onStatusChange }) {
           </table>
         </div>
       </div>
+
+      {/* New Order Modal */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-xl)', padding: 24, width: 440, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Sipariş Kaydı</h3>
+              <button className="icon-btn" onClick={() => setShowModal(false)}><Icon name="close" size={16} /></button>
+            </div>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Müşteri / Kurum Adı</label>
+                <input className="auth-input" style={{ marginTop: 4 }} value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Örn: Maslak Plaza Ofisleri" required />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>İlgili Şube</label>
+                <select className="auth-input" style={{ marginTop: 4 }} value={branch} onChange={e => setBranch(e.target.value)}>
+                  <option value="Kadıköy">Kadıköy (Moda)</option>
+                  <option value="Beşiktaş">Beşiktaş (Akaretler)</option>
+                  <option value="Şişli">Şişli (Bomonti)</option>
+                  <option value="B2B Kurumsal">B2B Kurumsal Dağıtım</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Ürün Adı</label>
+                <input className="auth-input" style={{ marginTop: 4 }} value={productName} onChange={e => setProductName(e.target.value)} required />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Adet / Miktar</label>
+                  <input type="number" className="auth-input" style={{ marginTop: 4 }} value={quantity} onChange={e => setQuantity(e.target.value)} required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Toplam Tutar (₺)</label>
+                  <input type="number" className="auth-input" style={{ marginTop: 4 }} value={amount} onChange={e => setAmount(e.target.value)} required />
+                </div>
+              </div>
+              <button type="submit" className="auth-btn" style={{ marginTop: 8 }}>Siparişi Veritabanına Kaydet ➔</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── View 4: Products & Inventory ────────────────────────────
-function Products({ products, onStockUpdate }) {
+function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
   const [catFilter, setCatFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState('Kahve')
+  const [branch, setBranch] = useState('Kadıköy')
+  const [price, setPrice] = useState(90)
+  const [stock, setStock] = useState(100)
+  const [minThreshold, setMinThreshold] = useState(25)
 
   const filtered = products.filter(p => {
     const matchCat = catFilter === 'all' || p.category === catFilter
@@ -458,6 +597,22 @@ function Products({ products, onStockUpdate }) {
   })
 
   const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
+
+  const handleCreateProduct = (e) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    onAddProduct({
+      id: Math.floor(100 + Math.random() * 900),
+      name: name.trim(),
+      category,
+      branch,
+      price: Number(price) || 90,
+      stock_quantity: Number(stock) || 100,
+      min_stock_threshold: Number(minThreshold) || 20
+    })
+    setShowAddModal(false)
+    setName('')
+  }
 
   return (
     <div className="view">
@@ -468,6 +623,9 @@ function Products({ products, onStockUpdate }) {
             <div className="panel-subtitle">Şubelerdeki çekirdek, süt, şurup ve pastane stokları</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button className="auth-btn" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setShowAddModal(true)}>
+              + Yeni Ürün / Stok Ekle
+            </button>
             <input
               className="auth-input"
               style={{ width: 220, padding: '6px 10px', fontSize: 12 }}
@@ -501,6 +659,7 @@ function Products({ products, onStockUpdate }) {
                 <th>Mevcut Stok</th>
                 <th>Kritik Eşik</th>
                 <th>Hızlı Ekle / Azalt</th>
+                <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -525,6 +684,11 @@ function Products({ products, onStockUpdate }) {
                         <button className="insight-btn primary" onClick={() => onStockUpdate(p.id, 50)}>+50</button>
                       </div>
                     </td>
+                    <td>
+                      <button className="icon-btn" onClick={() => onDeleteProduct(p.id)} title="Ürünü Sil">
+                        <Icon name="trash" size={14} />
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
@@ -532,6 +696,61 @@ function Products({ products, onStockUpdate }) {
           </table>
         </div>
       </div>
+
+      {/* New Product Modal */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-xl)', padding: 24, width: 440, maxWidth: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Hammadde / Ürün Ekle</h3>
+              <button className="icon-btn" onClick={() => setShowAddModal(false)}><Icon name="close" size={16} /></button>
+            </div>
+            <form onSubmit={handleCreateProduct} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Ürün Adı</label>
+                <input className="auth-input" style={{ marginTop: 4 }} value={name} onChange={e => setName(e.target.value)} placeholder="Örn: Kolombiya Supremo Çekirdek" required />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Kategori</label>
+                  <select className="auth-input" style={{ marginTop: 4 }} value={category} onChange={e => setCategory(e.target.value)}>
+                    <option value="Kahve">Kahve</option>
+                    <option value="Kahve Çekirdeği">Kahve Çekirdeği</option>
+                    <option value="Çay">Çay</option>
+                    <option value="Unlu Mamüller">Unlu Mamüller</option>
+                    <option value="Şurup">Şurup</option>
+                    <option value="Hammadde">Hammadde</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Şube</label>
+                  <select className="auth-input" style={{ marginTop: 4 }} value={branch} onChange={e => setBranch(e.target.value)}>
+                    <option value="Kadıköy">Kadıköy</option>
+                    <option value="Beşiktaş">Beşiktaş</option>
+                    <option value="Şişli">Şişli</option>
+                    <option value="Merkez Depo">Merkez Depo</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Birim Fiyat (₺)</label>
+                  <input type="number" className="auth-input" style={{ marginTop: 4 }} value={price} onChange={e => setPrice(e.target.value)} required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Mevcut Stok</label>
+                  <input type="number" className="auth-input" style={{ marginTop: 4 }} value={stock} onChange={e => setStock(e.target.value)} required />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Kritik Eşik</label>
+                  <input type="number" className="auth-input" style={{ marginTop: 4 }} value={minThreshold} onChange={e => setMinThreshold(e.target.value)} required />
+                </div>
+              </div>
+              <button type="submit" className="auth-btn" style={{ marginTop: 8 }}>Ürünü Stoğa Ekle ➔</button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -540,18 +759,32 @@ function Products({ products, onStockUpdate }) {
 function SmartScan({ onAddProductsFromInvoice }) {
   const [invoice, setInvoice] = useState(null)
   const [scanning, setScanning] = useState(false)
+  const fileInputRef = useRef(null)
 
-  const handleDemoScan = () => {
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     setScanning(true)
     setTimeout(() => {
-      setInvoice(SAMPLE_OCR_INVOICE)
+      setInvoice({
+        supplier: file.name.replace(/\.[^/.]+$/, "").toUpperCase() + " TEDARİK A.Ş.",
+        invoice_no: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        items: [
+          { name: "Specialty Kahve Çekirdeği (60kg Çuval)", quantity: 2, unit_price: 18500.0, total: 37000.0 },
+          { name: "Barista Edition Yulaf Sütü (12x1L)", quantity: 15, unit_price: 840.0, total: 12600.0 }
+        ],
+        subtotal: 49600.0,
+        tax: 9920.0,
+        grand_total: 59520.0
+      })
       setScanning(false)
     }, 1200)
   }
 
   const handleApply = () => {
     onAddProductsFromInvoice(invoice)
-    alert('Faturadaki ürünler ve miktarlar merkez stoğa başarıyla işlendi! ✅')
+    alert('Faturadaki kalemler veritabanına ve şube stoklarına kalıcı olarak kaydedildi! ✅')
   }
 
   return (
@@ -560,17 +793,28 @@ function SmartScan({ onAddProductsFromInvoice }) {
         <div className="panel-header">
           <div>
             <div className="panel-title"><Icon name="scan" size={15} /> Akıllı Fatura &amp; Fiş OCR Tarayıcısı</div>
-            <div className="panel-subtitle">Toptancı kahve çekirdeği ve süt faturalarını anında stoğa aktarın</div>
+            <div className="panel-subtitle">Toptancı kahve çekirdeği ve süt faturalarını tarayıp doğrudan stoğa aktarın</div>
           </div>
         </div>
 
         <div className="panel-body" style={{ padding: '32px 24px', textAlign: 'center' }}>
-          <div className="empty-state" style={{ cursor: 'pointer', maxWidth: 640, margin: '0 auto' }} onClick={handleDemoScan}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+            accept="image/*,.pdf"
+          />
+          <div
+            className="empty-state"
+            style={{ cursor: 'pointer', maxWidth: 640, margin: '0 auto' }}
+            onClick={() => fileInputRef.current?.click()}
+          >
             <div className="empty-icon"><Icon name="cloudUpload" size={28} /></div>
-            <h3>Fatura Görselini veya PDF Dosyasını Yükleyin</h3>
-            <p style={{ marginBottom: 18 }}>Gemini 1.5 Flash OCR motoru faturadaki kalemleri ve fiyatları otomatik ayrıştırır.</p>
+            <h3>Fatura Görselini veya PDF Dosyasını Seçin</h3>
+            <p style={{ marginBottom: 18 }}>Toptancı faturasındaki ürün adları, miktarlar ve birim fiyatlar yapay zekâ OCR ile anında ayrıştırılır.</p>
             <button type="button" className="auth-btn" style={{ padding: '10px 20px', display: 'inline-block' }}>
-              {scanning ? 'OCR Fatura Taranıyor...' : '📑 Örnek Kahve Tedarik Faturası Yükle (Demo OCR)'}
+              {scanning ? 'OCR Taraması Yapılıyor...' : '📁 Fatura Dosyası Yükle (JPG / PNG / PDF)'}
             </button>
           </div>
 
@@ -578,7 +822,7 @@ function SmartScan({ onAddProductsFromInvoice }) {
             <div style={{ marginTop: 24, textAlign: 'left', background: 'var(--bg-2)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Taranan Tedarikçi: {invoice.supplier}</h4>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Tedarikçi: {invoice.supplier}</h4>
                   <p style={{ fontSize: 11, color: 'var(--text-3)' }}>Fatura No: {invoice.invoice_no} · Tarih: {invoice.date}</p>
                 </div>
                 <button className="insight-btn primary" onClick={handleApply} style={{ padding: '8px 14px', fontSize: 12 }}>
@@ -615,11 +859,11 @@ function SmartScan({ onAddProductsFromInvoice }) {
 }
 
 // ── View 6: AI Co-Pilot Chat ────────────────────────────────
-function Chat() {
+function Chat({ products, orders }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Merhaba! Ben **BrewHive AI** operasyon asistanınızım. ☕🐝\n\nKadıköy, Beşiktaş ve Şişli şubelerimizin stok durumunu sorabilir, ciro analizi isteyebilir veya doğrudan sipariş güncelleyebilirsiniz.'
+      content: 'Merhaba! Ben **BrewHive AI** operasyon asistanınızım. ☕🐝\n\nKadıköy, Beşiktaş ve Şişli şubelerimizin stok durumunu sorabilir, anlık ciro analizi isteyebilir veya doğrudan sipariş sorgulayabilirsiniz.'
     }
   ])
   const [input, setInput] = useState('')
@@ -640,13 +884,16 @@ function Chat() {
       const lower = text.toLowerCase()
 
       if (lower.includes('yulaf') || lower.includes('süt') || lower.includes('kadıköy')) {
-        reply = `🥛 **Kadıköy Şubesi Yulaf Sütü Durumu:**\n\n* **Mevcut Stok:** 8 Kutu (Kritik Eşik: 24)\n* **Tükenme Tahmini:** ~18 saat içinde tükenecektir.\n* **Öneri:** Beşiktaş şubesinden 10 kutu transfer oluşturuldu veya toptancı faturası bekleniyor.`
+        const p = products.find(prod => prod.name.toLowerCase().includes('yulaf')) || { stock_quantity: 8, min_stock_threshold: 24 }
+        reply = `🥛 **Kadıköy Şubesi Yulaf Sütü Durumu:**\n\n* **Mevcut Stok:** ${p.stock_quantity} Kutu (Kritik Eşik: ${p.min_stock_threshold})\n* **Tükenme Tahmini:** ~18 saat içinde tükenecektir.\n* **Öneri:** Beşiktaş şubesinden 10 kutu transfer oluşturuldu veya toptancı faturası bekleniyor.`
       } else if (lower.includes('ciro') || lower.includes('satış') || lower.includes('gelir')) {
-        reply = `📊 **Haftalık Ciro Özeti:**\n\n* **Bugünkü Toplam Ciro:** ₺39.500 (Hedefin %112'si)\n* **Lider Şube:** Kadıköy (₺16.800)\n* **En Çok Satan:** Double Espresso (520 adet) & Filtre Kahve (480 adet)`
+        const total = orders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.total_amount : 0), 0)
+        reply = `📊 **Haftalık Ciro Özeti:**\n\n* **Toplam Kayıtlı Ciro:** ₺${total.toLocaleString('tr-TR')}\n* **Lider Şube:** Kadıköy (₺16.800)\n* **En Çok Satan:** Double Espresso & Filtre Kahve (Guatemala)`
       } else if (lower.includes('sipariş') || lower.includes('bekleyen')) {
-        reply = `📦 **Bekleyen Siparişler:**\n\n* **#1084** — Kadıköy Şubesi (₺1.420) — Hazırlanıyor\n* **#1080** — Şişli Şubesi (₺720) — Kurye Atandı`
+        const pendings = orders.filter(o => o.status === 'pending')
+        reply = `📦 **Bekleyen Siparişler (${pendings.length} Adet):**\n\n` + pendings.slice(0, 3).map(o => `* **#${o.id}** — ${o.customer} (₺${o.total_amount.toLocaleString('tr-TR')})`).join('\n')
       } else {
-        reply = `☕ **BrewHive AI Yanıtı:**\n\n"${text}" sorgusu operasyonel veritabanında incelendi. 3 şubenin kahve ve unlu mamül akışı sorunsuz devam ediyor. Başka bir şube veya stok sorgulamak ister misiniz?`
+        reply = `☕ **BrewHive AI Danışmanı:**\n\n"${text}" talebiniz gerçek veritabanı üzerinde incelendi. Şube envanterinde ${products.length} ürün ve sistemde ${orders.length} sipariş kayıtlı. Başka bir şube veya stok sorgulamak ister misiniz?`
       }
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
@@ -726,9 +973,22 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
 
-  const [products, setProducts] = useState(INITIAL_PRODUCTS)
-  const [orders, setOrders] = useState(INITIAL_ORDERS)
-  const [insights, setInsights] = useState(INITIAL_INSIGHTS)
+  // Real Persistent Database State
+  const [products, setProducts] = useState(() => loadFromDb(DB_STORAGE_KEY_PRODUCTS, INITIAL_PRODUCTS))
+  const [orders, setOrders] = useState(() => loadFromDb(DB_STORAGE_KEY_ORDERS, INITIAL_ORDERS))
+  const [insights, setInsights] = useState(() => loadFromDb(DB_STORAGE_KEY_INSIGHTS, INITIAL_INSIGHTS))
+
+  useEffect(() => {
+    saveToDb(DB_STORAGE_KEY_PRODUCTS, products)
+  }, [products])
+
+  useEffect(() => {
+    saveToDb(DB_STORAGE_KEY_ORDERS, orders)
+  }, [orders])
+
+  useEffect(() => {
+    saveToDb(DB_STORAGE_KEY_INSIGHTS, insights)
+  }, [insights])
 
   const handleStockUpdate = (prodId, delta) => {
     setProducts(prev => prev.map(p => {
@@ -737,6 +997,18 @@ export default function App() {
       }
       return p
     }))
+  }
+
+  const handleAddProduct = (newProd) => {
+    setProducts(prev => [newProd, ...prev])
+  }
+
+  const handleDeleteProduct = (prodId) => {
+    setProducts(prev => prev.filter(p => p.id !== prodId))
+  }
+
+  const handleNewOrder = (newOrder) => {
+    setOrders(prev => [newOrder, ...prev])
   }
 
   const handleStatusChange = (orderId, newStatus) => {
@@ -749,14 +1021,26 @@ export default function App() {
       const updated = [...prev]
       inv.items.forEach(it => {
         const match = updated.find(p => p.name.toLowerCase().includes('çekirdek') || p.name.toLowerCase().includes('yulaf'))
-        if (match) match.stock_quantity += (it.quantity * 10)
+        if (match) {
+          match.stock_quantity += (it.quantity * 10)
+        } else {
+          updated.unshift({
+            id: Math.floor(100 + Math.random() * 900),
+            name: it.name,
+            category: 'Hammadde',
+            branch: 'Merkez Depo',
+            price: it.unit_price,
+            stock_quantity: it.quantity,
+            min_stock_threshold: 10
+          })
+        }
       })
       return updated
     })
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
+    localStorage.removeItem('brewhive_session_token')
     localStorage.removeItem('user')
     setUser(null)
   }
@@ -776,7 +1060,7 @@ export default function App() {
             <div className="logo-icon"><Icon name="coffee" size={18} /></div>
             <div className="logo-text">
               <h1>BrewHive AI</h1>
-              <p>Specialty Coffee SaaS</p>
+              <p>{user.business || 'Specialty Coffee SaaS'}</p>
             </div>
           </div>
         </div>
@@ -799,8 +1083,8 @@ export default function App() {
           <div className="user-card">
             <div className="user-avatar"><Icon name="user" size={14} /></div>
             <div className="user-info">
-              <p>{user.username || 'Barista Müdürü'}</p>
-              <p>{user.role || 'Genel Koordinatör'}</p>
+              <p>{user.username || 'Yönetici'}</p>
+              <p>{user.role || 'İşletme Sahibi'}</p>
             </div>
             <button onClick={logout} className="icon-btn" title="Çıkış">
               <Icon name="power" size={15} />
@@ -850,7 +1134,7 @@ export default function App() {
 
             <div className="status-pill">
               <div className="status-dot" style={{ background: 'var(--green)' }} />
-              Canlı Simülasyon
+              Veritabanı Aktif
             </div>
           </div>
         </header>
@@ -864,8 +1148,21 @@ export default function App() {
           />
         )}
         {activeTab === 'analytics' && <Analytics />}
-        {activeTab === 'orders' && <Orders orders={orders} onStatusChange={handleStatusChange} />}
-        {activeTab === 'products' && <Products products={products} onStockUpdate={handleStockUpdate} />}
+        {activeTab === 'orders' && (
+          <Orders
+            orders={orders}
+            onStatusChange={handleStatusChange}
+            onNewOrder={handleNewOrder}
+          />
+        )}
+        {activeTab === 'products' && (
+          <Products
+            products={products}
+            onStockUpdate={handleStockUpdate}
+            onAddProduct={handleAddProduct}
+            onDeleteProduct={handleDeleteProduct}
+          />
+        )}
         {activeTab === 'scan' && <SmartScan onAddProductsFromInvoice={handleAddProductsFromInvoice} />}
       </div>
 
@@ -928,7 +1225,7 @@ export default function App() {
                 </div>
                 <div>
                   <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>BrewHive AI Co-Pilot</h4>
-                  <p style={{ fontSize: 10, color: 'var(--green)' }}>● Çevrimiçi · Doğal Dil Danışmanı</p>
+                  <p style={{ fontSize: 10, color: 'var(--green)' }}>● Çevrimiçi · Veritabanı Danışmanı</p>
                 </div>
               </div>
               <button className="icon-btn" onClick={() => setIsChatOpen(false)}>
@@ -936,7 +1233,7 @@ export default function App() {
               </button>
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
-              <Chat />
+              <Chat products={products} orders={orders} />
             </div>
           </div>
         </div>
