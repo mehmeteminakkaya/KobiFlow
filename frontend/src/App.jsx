@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts'
 
 import {
-  INITIAL_CUSTOMERS,
   INITIAL_PRODUCTS,
   INITIAL_ORDERS,
   INITIAL_INSIGHTS,
@@ -16,12 +15,7 @@ import {
   SAMPLE_OCR_INVOICE
 } from './mockData.js'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const WS_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000')
-  .replace('https://', 'wss://')
-  .replace('http://', 'ws://') + '/ws'
-
-// ── Icon Library (lucide-inspired inline SVG) ────────────
+// ── Icon Library (inline SVG) ──────────────────────────────
 const ICON_PATHS = {
   coffee:       <><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></>,
   store:        <><path d="M3 7l1.5-3h15L21 7"/><path d="M3 7v13h18V7"/><path d="M3 7h18"/><path d="M8 11v3a4 4 0 008 0v-3"/></>,
@@ -31,7 +25,6 @@ const ICON_PATHS = {
   search:       <><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
   send:         <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
   mic:          <><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0"/><line x1="12" y1="18" x2="12" y2="22"/></>,
-  micOff:       <><line x1="2" y1="2" x2="22" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0019 12v-2"/><path d="M5 10v2a7 7 0 0012 5"/><path d="M15 9.34V5a3 3 0 00-5.68-1.33"/><path d="M9 9v3a3 3 0 005.12 2.12"/></>,
   close:        <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
   check:        <><polyline points="20 6 9 17 4 12"/></>,
   plus:         <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
@@ -54,7 +47,6 @@ const ICON_PATHS = {
   database:     <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></>,
   bot:          <><rect x="3" y="8" width="18" height="12" rx="2"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/><line x1="12" y1="4" x2="12" y2="8"/><circle cx="12" cy="3" r="1"/><line x1="3" y1="14" x2="2" y2="14"/><line x1="22" y1="14" x2="21" y2="14"/></>,
   fileText:     <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
-  zap:          <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
   cloudUpload:  <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/><polyline points="16 16 12 12 8 16"/></>,
 }
 
@@ -103,79 +95,68 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff/86400)}g önce`
 }
 
-// ── Auth Screen with Instant 1-Click Demo Mode ──────────────
+// ── Auth Screen ─────────────────────────────────────────────
 function AuthScreen({ onLogin }) {
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('admin123')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
-  const handleDemoMode = () => {
-    const demoUser = { id: 1, username: 'admin', role: 'Genel Koordinatör', is_demo: true }
-    localStorage.setItem('token', 'brewhive-demo-jwt-token')
-    localStorage.setItem('user', JSON.stringify(demoUser))
-    onLogin(demoUser)
-  }
-
-  const submit = async (e) => {
+  const handleLogin = (e) => {
     if (e) e.preventDefault()
-    setLoading(true); setError('')
-    try {
-      const res = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        localStorage.setItem('token', data.access_token)
-        localStorage.setItem('user', JSON.stringify(data.user))
-        onLogin(data.user)
-      } else {
-        throw new Error('Giriş başarısız')
-      }
-    } catch {
-      // If backend is not running, seamlessly log into Demo Mode
-      handleDemoMode()
-    } finally {
-      setLoading(false)
-    }
+    const u = { id: 1, username: 'admin', role: 'Genel Koordinatör' }
+    localStorage.setItem('token', 'brewhive-auth-token')
+    localStorage.setItem('user', JSON.stringify(u))
+    onLogin(u)
   }
 
   return (
-    <div className="auth-overlay">
+    <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="logo-icon" style={{ width: 48, height: 48, background: 'var(--accent-soft)', color: 'var(--accent-2)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="coffee" size={26} />
+          <div className="logo-icon" style={{ width: 44, height: 44, margin: '0 auto 12px' }}>
+            <Icon name="coffee" size={24} />
           </div>
-          <h2>BrewHive AI</h2>
-          <p>Artisan Kahve Zinciri &amp; Akıllı Operasyon Yönetimi</p>
+          <h1>BrewHive AI</h1>
+          <p>Artisan Kahve Zinciri Operasyon Merkezi</p>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
-
-        <form onSubmit={submit} className="auth-form">
-          <div className="form-group">
-            <label>Kullanıcı Adı</label>
-            <input value={username} onChange={e => setUsername(e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label>Şifre</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-          </div>
-          <button type="submit" className="button primary full" disabled={loading}>
-            {loading ? 'Giriş Yapılıyor...' : 'Yönetici Girişi Yap ➔'}
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            className="auth-input"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="Kullanıcı Adı"
+            required
+          />
+          <input
+            className="auth-input"
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Şifre"
+            required
+          />
+          <button type="submit" className="auth-btn">
+            Yönetici Girişi Yap ➔
           </button>
         </form>
 
-        <div className="auth-divider"><span>VEYA</span></div>
-
-        <button type="button" onClick={handleDemoMode} className="button secondary full demo-btn">
-          ☕ Canlı Demo Moduna Gir (Hemen İncele ➔)
+        <button
+          type="button"
+          onClick={handleLogin}
+          style={{
+            background: 'var(--bg-2)',
+            border: '1px solid var(--accent-border)',
+            color: 'var(--accent-2)',
+            padding: '11px',
+            borderRadius: 'var(--r)',
+            fontWeight: 600,
+            fontSize: '13px'
+          }}
+        >
+          ☕ Canlı Demo Moduna Gir (Hemen Keşfet ➔)
         </button>
-        
-        <p className="auth-footer-hint">Kadıköy, Beşiktaş &amp; Şişli şube verileriyle tam interaktif simülasyon.</p>
+
+        <p className="auth-hint">Kadıköy, Beşiktaş &amp; Şişli şube verileriyle tam interaktif simülasyon.</p>
       </div>
     </div>
   )
@@ -184,23 +165,26 @@ function AuthScreen({ onLogin }) {
 // ── Notification Center ─────────────────────────────────────
 function NotificationCenter({ insights, onClose }) {
   return (
-    <div className="notif-dropdown">
-      <div className="notif-header">
-        <h4>Şube &amp; Stok Bildirimleri</h4>
+    <div className="notif-dropdown" style={{
+      position: 'absolute', top: 52, right: 24, zIndex: 60,
+      width: 360, background: 'var(--bg-1)', border: '1px solid var(--border-2)',
+      borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-lg)', padding: '14px 16px'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 600 }}>Şube Alarmları</h4>
         <button onClick={onClose} className="icon-btn"><Icon name="close" size={14} /></button>
       </div>
-      <div className="notif-list">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {insights.map((ins, i) => {
           const cfg = SEVERITY_CONFIG[ins.severity] || SEVERITY_CONFIG.info
           return (
-            <div key={i} className="notif-item">
-              <div className="notif-badge" style={{ background: cfg.bg, color: cfg.color }}>
+            <div key={i} style={{ display: 'flex', gap: 10, padding: 8, background: 'var(--bg-2)', borderRadius: 'var(--r)', border: '1px solid var(--border)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 'var(--r)', background: cfg.bg, color: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name={cfg.iconName} size={14} />
               </div>
-              <div className="notif-body">
-                <h5>{ins.title}</h5>
-                <p>{ins.content}</p>
-                <span className="notif-time">{timeAgo(ins.created_at)}</span>
+              <div style={{ flex: 1, fontSize: 12 }}>
+                <h5 style={{ fontWeight: 600, color: 'var(--text)' }}>{ins.title}</h5>
+                <p style={{ color: 'var(--text-3)', marginTop: 2 }}>{ins.content}</p>
               </div>
             </div>
           )
@@ -211,7 +195,7 @@ function NotificationCenter({ insights, onClose }) {
 }
 
 // ── View 1: Dashboard ───────────────────────────────────────
-function Dashboard({ products, orders, insights, selectedBranch, onQuickStockAdd }) {
+function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
   const branchOrders = selectedBranch === 'Tümü' 
     ? orders 
     : orders.filter(o => o.branch?.includes(selectedBranch) || o.customer?.includes(selectedBranch))
@@ -221,72 +205,55 @@ function Dashboard({ products, orders, insights, selectedBranch, onQuickStockAdd
   const criticalStock = products.filter(p => p.stock_quantity <= p.min_stock_threshold)
 
   return (
-    <div className="view dashboard-view">
-      {/* KPI Cards */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-title">Toplam Ciro (Bugün)</span>
-            <div className="kpi-icon" style={{ color: 'var(--accent-2)', background: 'var(--accent-soft)' }}>
-              <Icon name="coffee" size={18} />
-            </div>
-          </div>
-          <div className="kpi-value">₺{totalRevenue.toLocaleString('tr-TR')}</div>
-          <div className="kpi-sub positive"><Icon name="trendingUp" size={12} /> Geçen haftaya göre +%18.4</div>
+    <div className="view">
+      <div className="stats-grid">
+        <div className="stat-card yellow">
+          <div className="stat-icon"><Icon name="coffee" size={18} /></div>
+          <div className="revenue-badge up"><Icon name="trendingUp" size={11} /> +18.4%</div>
+          <div className="stat-value">₺{totalRevenue.toLocaleString('tr-TR')}</div>
+          <div className="stat-label">Toplam Ciro (Bugün)</div>
+          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli toplamı</div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-title">Bekleyen / Hazırlanan</span>
-            <div className="kpi-icon" style={{ color: 'var(--amber)', background: 'var(--amber-soft)' }}>
-              <Icon name="package" size={18} />
-            </div>
-          </div>
-          <div className="kpi-value">{pendingOrders.length} Sipariş</div>
-          <div className="kpi-sub"><Icon name="clock" size={12} /> Ortalama hazırlık: 4.8 dk</div>
+        <div className="stat-card cyan">
+          <div className="stat-icon"><Icon name="package" size={18} /></div>
+          <div className="stat-value">{pendingOrders.length} Sipariş</div>
+          <div className="stat-label">Bekleyen / Hazırlanan</div>
+          <div className="stat-trend">Ortalama servis hızı: 4.8 dk</div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-title">Kritik Stok Uyarısı</span>
-            <div className="kpi-icon" style={{ color: 'var(--red)', background: 'var(--red-soft)' }}>
-              <Icon name="alertCircle" size={18} />
-            </div>
-          </div>
-          <div className="kpi-value">{criticalStock.length} Kalem</div>
-          <div className="kpi-sub negative"><Icon name="trendingDown" size={12} /> Yulaf sütü &amp; Kruvasan acil</div>
+        <div className="stat-card red">
+          <div className="stat-icon"><Icon name="alertCircle" size={18} /></div>
+          <div className="stat-value">{criticalStock.length} Kalem</div>
+          <div className="stat-label">Kritik Stok Uyarısı</div>
+          <div className="stat-trend">Yulaf sütü &amp; Kruvasan acil</div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-title">Aktif Şube Sayısı</span>
-            <div className="kpi-icon" style={{ color: 'var(--green)', background: 'var(--green-soft)' }}>
-              <Icon name="store" size={18} />
-            </div>
-          </div>
-          <div className="kpi-value">3 Şube + B2B</div>
-          <div className="kpi-sub positive"><Icon name="checkCircle" size={12} /> Kadıköy, Beşiktaş, Şişli</div>
+        <div className="stat-card green">
+          <div className="stat-icon"><Icon name="store" size={18} /></div>
+          <div className="stat-value">3 Şube + B2B</div>
+          <div className="stat-label">Aktif Şube Ağı</div>
+          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli (Canlı)</div>
         </div>
       </div>
 
-      {/* Main Grid: Revenue Chart & Critical Stock */}
-      <div className="grid-2-1">
-        <div className="card">
-          <div className="card-header">
+      <div className="panel-grid">
+        <div className="panel">
+          <div className="panel-header">
             <div>
-              <h3>Haftalık Şube Gelir Dağılımı</h3>
-              <p className="card-subtitle">Kadıköy, Beşiktaş ve Şişli anlık ciro performansı</p>
+              <div className="panel-title"><Icon name="barChart" size={15} /> Haftalık Şube Gelir Trendi</div>
+              <div className="panel-subtitle">Kadıköy, Beşiktaş ve Şişli anlık ciro dağılımı</div>
             </div>
           </div>
-          <div style={{ height: 260, width: '100%' }}>
+          <div className="panel-body" style={{ height: 260, padding: '16px 14px 4px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={REVENUE_CHART_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorKadikoy" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorKdk" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#d97706" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#d97706" stopOpacity={0.0}/>
                   </linearGradient>
-                  <linearGradient id="colorBesiktas" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorBsk" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
                   </linearGradient>
@@ -295,29 +262,28 @@ function Dashboard({ products, orders, insights, selectedBranch, onQuickStockAdd
                 <XAxis dataKey="day" stroke="var(--text-3)" fontSize={12} />
                 <YAxis stroke="var(--text-3)" fontSize={12} tickFormatter={v => `₺${v/1000}k`} />
                 <Tooltip contentStyle={{ background: '#16181f', border: '1px solid var(--border)', borderRadius: 8 }} formatter={v => [`₺${v.toLocaleString('tr-TR')}`, '']} />
-                <Area type="monotone" dataKey="kadikoy" name="Kadıköy" stroke="#d97706" fillOpacity={1} fill="url(#colorKadikoy)" />
-                <Area type="monotone" dataKey="besiktas" name="Beşiktaş" stroke="#10b981" fillOpacity={1} fill="url(#colorBesiktas)" />
+                <Area type="monotone" dataKey="kadikoy" name="Kadıköy" stroke="#d97706" fillOpacity={1} fill="url(#colorKdk)" />
+                <Area type="monotone" dataKey="besiktas" name="Beşiktaş" stroke="#10b981" fillOpacity={1} fill="url(#colorBsk)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Actionable Critical Stock List */}
-        <div className="card">
-          <div className="card-header">
+        <div className="panel">
+          <div className="panel-header">
             <div>
-              <h3>Kritik Stok Alarmları</h3>
-              <p className="card-subtitle">Eşiğin altına düşen hammaddeler</p>
+              <div className="panel-title"><Icon name="alertTriangle" size={15} /> Kritik Hammadde Alarmları</div>
+              <div className="panel-subtitle">Tükenme riski olan ürünler</div>
             </div>
           </div>
-          <div className="critical-stock-list">
+          <div className="panel-body" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {criticalStock.map((prod, i) => (
-              <div key={i} className="critical-item">
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
-                  <h4>{prod.name}</h4>
-                  <p>{prod.branch} · Stok: <strong style={{ color: 'var(--red)' }}>{prod.stock_quantity}</strong> (Min: {prod.min_stock_threshold})</p>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{prod.name}</h4>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{prod.branch} · Stok: <strong style={{ color: 'var(--red)' }}>{prod.stock_quantity}</strong> (Eşik: {prod.min_stock_threshold})</p>
                 </div>
-                <button className="button small primary" onClick={() => onQuickStockAdd(prod.id, 20)}>
+                <button className="insight-btn primary" onClick={() => onQuickStockAdd(prod.id, 20)}>
                   +20 Ekle
                 </button>
               </div>
@@ -326,15 +292,14 @@ function Dashboard({ products, orders, insights, selectedBranch, onQuickStockAdd
         </div>
       </div>
 
-      {/* Recent Orders Table */}
-      <div className="card">
-        <div className="card-header">
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div className="panel-header">
           <div>
-            <h3>Canlı Sipariş Akışı</h3>
-            <p className="card-subtitle">Şubelerden ve B2B kurumsal müşterilerden gelen son siparişler</p>
+            <div className="panel-title"><Icon name="package" size={15} /> Canlı Sipariş Akışı</div>
+            <div className="panel-subtitle">Şubelerden ve B2B kurumsal müşterilerden gelen son siparişler</div>
           </div>
         </div>
-        <div className="table-responsive">
+        <div className="panel-body">
           <table className="data-table">
             <thead>
               <tr>
@@ -366,16 +331,18 @@ function Dashboard({ products, orders, insights, selectedBranch, onQuickStockAdd
 }
 
 // ── View 2: Analytics ───────────────────────────────────────
-function Analytics({ products, orders }) {
+function Analytics() {
   return (
-    <div className="view analytics-view">
-      <div className="grid-2-1">
-        <div className="card">
-          <div className="card-header">
-            <h3>Kategori Bazlı Satış Hacmi</h3>
-            <p className="card-subtitle">Haftalık sipariş dağılım yüzdeleri</p>
+    <div className="view">
+      <div className="panel-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <div className="panel-title"><Icon name="barChart" size={15} /> Kategori Bazlı Satış Hacmi</div>
+              <div className="panel-subtitle">Haftalık sipariş dağılım yüzdeleri</div>
+            </div>
           </div>
-          <div style={{ height: 280 }}>
+          <div className="panel-body" style={{ height: 280, padding: 16 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={CATEGORY_DISTRIBUTION} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} label={({ name, percent }) => `${name} %${(percent * 100).toFixed(0)}`}>
@@ -389,17 +356,19 @@ function Analytics({ products, orders }) {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h3>Günün En Çok Satanları</h3>
-            <p className="card-subtitle">Adet bazında lider içecek &amp; tatlılar</p>
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <div className="panel-title"><Icon name="sparkles" size={15} /> Günün En Çok Satanları</div>
+              <div className="panel-subtitle">Adet bazında lider ürünler</div>
+            </div>
           </div>
-          <div className="top-product-list">
-            <div className="top-p-item"><span>1. Double Espresso</span><strong>520 Porsiyon</strong></div>
-            <div className="top-p-item"><span>2. Filtre Kahve (Guatemala)</span><strong>480 Porsiyon</strong></div>
-            <div className="top-p-item"><span>3. Doğu Karadeniz Çayı</span><strong>420 Bardak</strong></div>
-            <div className="top-p-item"><span>4. Iced Americano</span><strong>350 Porsiyon</strong></div>
-            <div className="top-p-item"><span>5. Belçika Sıcak Çikolata</span><strong>310 Porsiyon</strong></div>
+          <div className="panel-body" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>1. Double Espresso</span><strong>520 Porsiyon</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>2. Filtre Kahve (Guatemala)</span><strong>480 Porsiyon</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>3. Doğu Karadeniz Çayı</span><strong>420 Bardak</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>4. Iced Americano</span><strong>350 Porsiyon</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>5. Belçika Sıcak Çikolata</span><strong>310 Porsiyon</strong></div>
           </div>
         </div>
       </div>
@@ -410,27 +379,30 @@ function Analytics({ products, orders }) {
 // ── View 3: Orders ──────────────────────────────────────────
 function Orders({ orders, onStatusChange }) {
   const [filter, setFilter] = useState('all')
-
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
 
   return (
-    <div className="view orders-view">
-      <div className="card">
-        <div className="card-header-flex">
+    <div className="view">
+      <div className="panel">
+        <div className="panel-header">
           <div>
-            <h3>Sipariş &amp; Lojistik Yönetimi</h3>
-            <p className="card-subtitle">Şube transferleri ve müşteri siparişleri</p>
+            <div className="panel-title"><Icon name="package" size={15} /> Sipariş &amp; Lojistik Yönetimi</div>
+            <div className="panel-subtitle">Şube transferleri ve müşteri siparişleri</div>
           </div>
-          <div className="filter-chips">
+          <div style={{ display: 'flex', gap: 6 }}>
             {['all', 'pending', 'shipped', 'delivered', 'cancelled'].map(st => (
-              <button key={st} className={`chip-btn ${filter === st ? 'active' : ''}`} onClick={() => setFilter(st)}>
+              <button
+                key={st}
+                className={`insight-btn ${filter === st ? 'primary' : ''}`}
+                onClick={() => setFilter(st)}
+              >
                 {st === 'all' ? 'Tümü' : STATUS[st]?.label}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="table-responsive">
+        <div className="panel-body">
           <table className="data-table">
             <thead>
               <tr>
@@ -449,17 +421,17 @@ function Orders({ orders, onStatusChange }) {
                   <td><strong>#{o.id}</strong></td>
                   <td>{o.customer}</td>
                   <td>{o.items?.map(it => `${it.product_name} x${it.quantity}`).join(', ') || 'Özel Sipariş'}</td>
-                  <td><span className="carrier-tag"><Icon name="truck" size={12} /> {o.shipment?.carrier || 'Özel Kurye'} ({o.shipment?.tracking || 'Takip No Yok'})</span></td>
+                  <td><Icon name="truck" size={12} /> {o.shipment?.carrier || 'Özel Kurye'}</td>
                   <td><strong>₺{o.total_amount?.toLocaleString('tr-TR')}</strong></td>
                   <td><span className={`badge ${STATUS[o.status]?.cls}`}>{STATUS[o.status]?.label}</span></td>
                   <td>
                     {o.status === 'pending' && (
-                      <button className="button tiny primary" onClick={() => onStatusChange(o.id, 'shipped')}>
+                      <button className="insight-btn primary" onClick={() => onStatusChange(o.id, 'shipped')}>
                         Kargoya Ver
                       </button>
                     )}
                     {o.status === 'shipped' && (
-                      <button className="button tiny success" onClick={() => onStatusChange(o.id, 'delivered')}>
+                      <button className="insight-btn" style={{ color: 'var(--green)' }} onClick={() => onStatusChange(o.id, 'delivered')}>
                         Teslim Et
                       </button>
                     )}
@@ -488,28 +460,37 @@ function Products({ products, onStockUpdate }) {
   const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
 
   return (
-    <div className="view products-view">
-      <div className="card">
-        <div className="card-header-flex">
+    <div className="view">
+      <div className="panel">
+        <div className="panel-header">
           <div>
-            <h3>Kahve &amp; Hammadde Envanteri</h3>
-            <p className="card-subtitle">Şubelerdeki çekirdek, süt, şurup ve pastane stokları</p>
+            <div className="panel-title"><Icon name="coffee" size={15} /> Kahve &amp; Hammadde Envanteri</div>
+            <div className="panel-subtitle">Şubelerdeki çekirdek, süt, şurup ve pastane stokları</div>
           </div>
-          <div className="search-box">
-            <Icon name="search" size={14} />
-            <input placeholder="Ürün veya çekirdek ara..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              className="auth-input"
+              style={{ width: 220, padding: '6px 10px', fontSize: 12 }}
+              placeholder="Ürün veya çekirdek ara..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
-        <div className="filter-chips">
+        <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {categories.map(c => (
-            <button key={c} className={`chip-btn ${catFilter === c ? 'active' : ''}`} onClick={() => setCatFilter(c)}>
+            <button
+              key={c}
+              className={`insight-btn ${catFilter === c ? 'primary' : ''}`}
+              onClick={() => setCatFilter(c)}
+            >
               {c === 'all' ? 'Tüm Kategoriler' : c}
             </button>
           ))}
         </div>
 
-        <div className="table-responsive">
+        <div className="panel-body">
           <table className="data-table">
             <thead>
               <tr>
@@ -526,22 +507,22 @@ function Products({ products, onStockUpdate }) {
               {filtered.map(p => {
                 const isCritical = p.stock_quantity <= p.min_stock_threshold
                 return (
-                  <tr key={p.id} className={isCritical ? 'row-critical' : ''}>
+                  <tr key={p.id}>
                     <td><strong>{p.name}</strong></td>
-                    <td><span className="category-pill">{p.category}</span></td>
+                    <td><span className="badge badge-ok">{p.category}</span></td>
                     <td>{p.branch || 'Merkez Depo'}</td>
                     <td>₺{p.price?.toFixed(2)}</td>
                     <td>
-                      <span className={`stock-badge ${isCritical ? 'critical' : 'normal'}`}>
+                      <span className={`badge ${isCritical ? 'badge-critical' : 'badge-ok'}`}>
                         {p.stock_quantity} Adet
                       </span>
                     </td>
                     <td>{p.min_stock_threshold}</td>
                     <td>
-                      <div className="stock-controls">
-                        <button className="stock-btn" onClick={() => onStockUpdate(p.id, -5)}>-5</button>
-                        <button className="stock-btn add" onClick={() => onStockUpdate(p.id, 10)}>+10</button>
-                        <button className="stock-btn add" onClick={() => onStockUpdate(p.id, 50)}>+50</button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="insight-btn" onClick={() => onStockUpdate(p.id, -5)}>-5</button>
+                        <button className="insight-btn primary" onClick={() => onStockUpdate(p.id, 10)}>+10</button>
+                        <button className="insight-btn primary" onClick={() => onStockUpdate(p.id, 50)}>+50</button>
                       </div>
                     </td>
                   </tr>
@@ -559,14 +540,12 @@ function Products({ products, onStockUpdate }) {
 function SmartScan({ onAddProductsFromInvoice }) {
   const [invoice, setInvoice] = useState(null)
   const [scanning, setScanning] = useState(false)
-  const [uploaded, setUploaded] = useState(false)
 
   const handleDemoScan = () => {
     setScanning(true)
     setTimeout(() => {
       setInvoice(SAMPLE_OCR_INVOICE)
       setScanning(false)
-      setUploaded(true)
     }, 1200)
   }
 
@@ -576,65 +555,67 @@ function SmartScan({ onAddProductsFromInvoice }) {
   }
 
   return (
-    <div className="view scan-view">
-      <div className="card">
-        <div className="card-header">
+    <div className="view">
+      <div className="panel">
+        <div className="panel-header">
           <div>
-            <h3>Akıllı Fatura &amp; Fiş OCR Tarayıcısı</h3>
-            <p className="card-subtitle">Toptancıdan gelen kahve çekirdeği ve hammadde faturalarını anında stoğa aktarın</p>
+            <div className="panel-title"><Icon name="scan" size={15} /> Akıllı Fatura &amp; Fiş OCR Tarayıcısı</div>
+            <div className="panel-subtitle">Toptancı kahve çekirdeği ve süt faturalarını anında stoğa aktarın</div>
           </div>
         </div>
 
-        <div className="upload-dropzone" onClick={handleDemoScan}>
-          <div className="upload-icon"><Icon name="cloudUpload" size={36} /></div>
-          <h4>Fatura görselini veya PDF dosyasını buraya sürükleyin</h4>
-          <p>Desteklenen formatlar: JPG, PNG, PDF (Gemini 1.5 Flash OCR)</p>
-          <button type="button" className="button primary demo-scan-btn">
-            {scanning ? 'OCR Fatura Taranıyor...' : '📑 Örnek Kahve Tedarik Faturası Yükle (Demo OCR)'}
-          </button>
-        </div>
+        <div className="panel-body" style={{ padding: '32px 24px', textAlign: 'center' }}>
+          <div className="empty-state" style={{ cursor: 'pointer', maxWidth: 640, margin: '0 auto' }} onClick={handleDemoScan}>
+            <div className="empty-icon"><Icon name="cloudUpload" size={28} /></div>
+            <h3>Fatura Görselini veya PDF Dosyasını Yükleyin</h3>
+            <p style={{ marginBottom: 18 }}>Gemini 1.5 Flash OCR motoru faturadaki kalemleri ve fiyatları otomatik ayrıştırır.</p>
+            <button type="button" className="auth-btn" style={{ padding: '10px 20px', display: 'inline-block' }}>
+              {scanning ? 'OCR Fatura Taranıyor...' : '📑 Örnek Kahve Tedarik Faturası Yükle (Demo OCR)'}
+            </button>
+          </div>
 
-        {invoice && (
-          <div className="ocr-result-card">
-            <div className="ocr-result-header">
-              <div>
-                <h4>Taranan Fatura: {invoice.supplier}</h4>
-                <p>Fatura No: <strong>{invoice.invoice_no}</strong> · Tarih: <strong>{invoice.date}</strong></p>
+          {invoice && (
+            <div style={{ marginTop: 24, textAlign: 'left', background: 'var(--bg-2)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', padding: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Taranan Tedarikçi: {invoice.supplier}</h4>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)' }}>Fatura No: {invoice.invoice_no} · Tarih: {invoice.date}</p>
+                </div>
+                <button className="insight-btn primary" onClick={handleApply} style={{ padding: '8px 14px', fontSize: 12 }}>
+                  <Icon name="check" size={14} /> Stoğa Otomatik Aktar (₺{invoice.grand_total.toLocaleString('tr-TR')})
+                </button>
               </div>
-              <button className="button success" onClick={handleApply}>
-                <Icon name="check" size={16} /> Stoğa Otomatik Aktar (₺{invoice.grand_total.toLocaleString('tr-TR')})
-              </button>
-            </div>
 
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Ürün Açıklaması</th>
-                  <th>Miktar</th>
-                  <th>Birim Fiyat</th>
-                  <th>Toplam Tutar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.items.map((it, i) => (
-                  <tr key={i}>
-                    <td><strong>{it.name}</strong></td>
-                    <td>{it.quantity}</td>
-                    <td>₺{it.unit_price.toLocaleString('tr-TR')}</td>
-                    <td><strong>₺{it.total.toLocaleString('tr-TR')}</strong></td>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Ürün Açıklaması</th>
+                    <th>Miktar</th>
+                    <th>Birim Fiyat</th>
+                    <th>Toplam Tutar</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {invoice.items.map((it, i) => (
+                    <tr key={i}>
+                      <td><strong>{it.name}</strong></td>
+                      <td>{it.quantity}</td>
+                      <td>₺{it.unit_price.toLocaleString('tr-TR')}</td>
+                      <td><strong>₺{it.total.toLocaleString('tr-TR')}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
 // ── View 6: AI Co-Pilot Chat ────────────────────────────────
-function Chat({ compact = false }) {
+function Chat() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -670,7 +651,7 @@ function Chat({ compact = false }) {
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
       setLoading(false)
-    }, 600)
+    }, 500)
   }
 
   useEffect(() => {
@@ -678,36 +659,49 @@ function Chat({ compact = false }) {
   }, [messages, loading])
 
   return (
-    <div className={`chat-container ${compact ? 'compact' : ''}`}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="chat-messages">
         {messages.map((m, i) => (
-          <div key={i} className={`chat-msg ${m.role}`}>
-            <div className="msg-avatar">
-              <Icon name={m.role === 'user' ? 'user' : 'bot'} size={14} />
-            </div>
-            <div className="msg-content">
+          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            {m.role !== 'user' && (
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="bot" size={14} />
+              </div>
+            )}
+            <div style={{
+              maxWidth: '82%',
+              padding: '10px 14px',
+              borderRadius: 'var(--r-lg)',
+              background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-2)',
+              color: m.role === 'user' ? '#fff' : 'var(--text)',
+              fontSize: 13,
+              lineHeight: 1.5,
+              border: m.role === 'user' ? 'none' : '1px solid var(--border-2)'
+            }}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
             </div>
           </div>
         ))}
         {loading && (
-          <div className="chat-msg assistant">
-            <div className="msg-avatar"><Icon name="bot" size={14} /></div>
-            <div className="msg-content"><span className="thinking-dots">Yapay zekâ yanıtlıyor...</span></div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--text-3)', fontSize: 12 }}>
+            <Icon name="bot" size={14} />
+            <span>Yapay zekâ yanıtlıyor...</span>
           </div>
         )}
         <div ref={endRef} />
       </div>
 
-      <div className="chat-input-bar">
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, background: 'var(--bg-1)' }}>
         <input
+          className="auth-input"
+          style={{ flex: 1 }}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="Örn: Kadıköy yulaf sütü kaç kaldı? Ciro durumu nedir?"
+          placeholder="Örn: Kadıköy yulaf sütü kaç kaldı? Ciro nedir?"
         />
-        <button className="button primary icon-only" onClick={() => send()} disabled={!input.trim() || loading}>
-          <Icon name="send" size={16} />
+        <button className="auth-btn" style={{ padding: '0 16px' }} onClick={() => send()} disabled={!input.trim() || loading}>
+          <Icon name="send" size={15} />
         </button>
       </div>
     </div>
@@ -732,7 +726,6 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
 
-  // Local state initialized with rich mock data
   const [products, setProducts] = useState(INITIAL_PRODUCTS)
   const [orders, setOrders] = useState(INITIAL_ORDERS)
   const [insights, setInsights] = useState(INITIAL_INSIGHTS)
@@ -740,8 +733,7 @@ export default function App() {
   const handleStockUpdate = (prodId, delta) => {
     setProducts(prev => prev.map(p => {
       if (p.id === prodId) {
-        const newStock = Math.max(0, p.stock_quantity + delta)
-        return { ...p, stock_quantity: newStock }
+        return { ...p, stock_quantity: Math.max(0, p.stock_quantity + delta) }
       }
       return p
     }))
@@ -773,120 +765,182 @@ export default function App() {
     return <AuthScreen onLogin={setUser} />
   }
 
+  const currentView = VIEWS.find(v => v.id === activeTab) || VIEWS[0]
+
   return (
-    <div className="app-shell">
+    <>
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="logo-icon"><Icon name="coffee" size={20} /></div>
-          <div>
-            <h1 className="brand-title">BrewHive AI</h1>
-            <p className="brand-sub">Specialty Coffee SaaS</p>
+          <div className="logo-row">
+            <div className="logo-icon"><Icon name="coffee" size={18} /></div>
+            <div className="logo-text">
+              <h1>BrewHive AI</h1>
+              <p>Specialty Coffee SaaS</p>
+            </div>
           </div>
         </div>
 
-        <nav className="sidebar-nav">
+        <div className="sidebar-section">
+          <div className="sidebar-section-label">Menü</div>
           {VIEWS.map(v => (
             <button
               key={v.id}
               className={`nav-item ${activeTab === v.id ? 'active' : ''}`}
               onClick={() => setActiveTab(v.id)}
             >
-              <Icon name={v.icon} size={18} />
+              <span className="nav-icon"><Icon name={v.icon} size={16} /></span>
               <span>{v.label}</span>
             </button>
           ))}
-        </nav>
+        </div>
 
         <div className="sidebar-footer">
-          <div className="user-profile">
+          <div className="user-card">
             <div className="user-avatar"><Icon name="user" size={14} /></div>
-            <div className="user-meta">
-              <strong>{user.username || 'Barista Müdürü'}</strong>
-              <span>{user.role || 'Genel Koordinatör'}</span>
+            <div className="user-info">
+              <p>{user.username || 'Barista Müdürü'}</p>
+              <p>{user.role || 'Genel Koordinatör'}</p>
             </div>
-            <button onClick={logout} className="logout-btn" title="Çıkış"><Icon name="power" size={15} /></button>
+            <button onClick={logout} className="icon-btn" title="Çıkış">
+              <Icon name="power" size={15} />
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="main-content">
+      <div className="main-content">
         <header className="topbar">
           <div className="topbar-left">
-            <h2>{VIEWS.find(v => v.id === activeTab)?.label}</h2>
-            <span className="topbar-sub">· {VIEWS.find(v => v.id === activeTab)?.sub}</span>
+            <h2>{currentView.label}</h2>
+            <p>· {currentView.sub}</p>
           </div>
 
           <div className="topbar-right">
             {/* Branch Selector */}
-            <div className="branch-selector">
-              <Icon name="store" size={14} />
-              <select value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)}>
-                <option value="Tümü">Tüm Şubeler (3 Şube + B2B)</option>
-                <option value="Kadıköy">Kadıköy (Moda)</option>
-                <option value="Beşiktaş">Beşiktaş (Akaretler)</option>
-                <option value="Şişli">Şişli (Bomonti)</option>
-              </select>
-            </div>
+            <select
+              value={selectedBranch}
+              onChange={e => setSelectedBranch(e.target.value)}
+              style={{
+                background: 'var(--bg-2)',
+                color: 'var(--text)',
+                border: '1px solid var(--border-2)',
+                borderRadius: 'var(--r)',
+                padding: '6px 12px',
+                fontSize: 12,
+                fontFamily: 'inherit',
+                outline: 'none'
+              }}
+            >
+              <option value="Tümü">Tüm Şubeler (3 Şube + B2B)</option>
+              <option value="Kadıköy">Kadıköy (Moda)</option>
+              <option value="Beşiktaş">Beşiktaş (Akaretler)</option>
+              <option value="Şişli">Şişli (Bomonti)</option>
+            </select>
 
             {/* Notification Bell */}
-            <div className="notif-wrapper">
-              <button className="topbar-btn" onClick={() => setShowNotifs(!showNotifs)}>
+            <div style={{ position: 'relative' }}>
+              <button className="topbar-icon-btn" onClick={() => setShowNotifs(!showNotifs)}>
                 <Icon name="bell" size={16} />
-                {insights.length > 0 && <span className="badge-count">{insights.length}</span>}
+                {insights.length > 0 && <span className="topbar-badge">{insights.length}</span>}
               </button>
               {showNotifs && <NotificationCenter insights={insights} onClose={() => setShowNotifs(false)} />}
             </div>
 
-            <div className="live-badge">
-              <span className="live-dot" />
-              <span>Canlı Simülasyon</span>
+            <div className="status-pill">
+              <div className="status-dot" style={{ background: 'var(--green)' }} />
+              Canlı Simülasyon
             </div>
           </div>
         </header>
 
-        <div className="content-body">
-          {activeTab === 'dashboard' && (
-            <Dashboard
-              products={products}
-              orders={orders}
-              insights={insights}
-              selectedBranch={selectedBranch}
-              onQuickStockAdd={(id, delta) => handleStockUpdate(id, delta)}
-            />
-          )}
-          {activeTab === 'analytics' && <Analytics products={products} orders={orders} />}
-          {activeTab === 'orders' && <Orders orders={orders} onStatusChange={handleStatusChange} />}
-          {activeTab === 'products' && <Products products={products} onStockUpdate={handleStockUpdate} />}
-          {activeTab === 'scan' && <SmartScan onAddProductsFromInvoice={handleAddProductsFromInvoice} />}
-        </div>
-      </main>
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            products={products}
+            orders={orders}
+            selectedBranch={selectedBranch}
+            onQuickStockAdd={(id, delta) => handleStockUpdate(id, delta)}
+          />
+        )}
+        {activeTab === 'analytics' && <Analytics />}
+        {activeTab === 'orders' && <Orders orders={orders} onStatusChange={handleStatusChange} />}
+        {activeTab === 'products' && <Products products={products} onStockUpdate={handleStockUpdate} />}
+        {activeTab === 'scan' && <SmartScan onAddProductsFromInvoice={handleAddProductsFromInvoice} />}
+      </div>
 
       {/* Floating AI Chat Assistant */}
-      <button className="floating-ai-btn" onClick={() => setIsChatOpen(true)} title="BrewHive AI Asistanı Aç">
+      <button
+        onClick={() => setIsChatOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--accent), #b45309)',
+          border: '1px solid var(--accent-border)',
+          color: '#fff',
+          boxShadow: '0 8px 24px rgba(217,119,6,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 40
+        }}
+        title="BrewHive AI Co-Pilot"
+      >
         <Icon name="bot" size={22} />
-        <span className="ai-btn-pulse" />
       </button>
 
       {/* AI Drawer Modal */}
       {isChatOpen && (
-        <div className="ai-drawer-backdrop" onClick={() => setIsChatOpen(false)}>
-          <div className="ai-drawer-panel" onClick={e => e.stopPropagation()}>
-            <div className="ai-drawer-header">
-              <div className="ai-title-row">
-                <div className="ai-logo"><Icon name="bot" size={16} /></div>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 100,
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}
+          onClick={() => setIsChatOpen(false)}
+        >
+          <div
+            style={{
+              width: 440,
+              maxWidth: '90vw',
+              height: '100%',
+              background: 'var(--bg-1)',
+              borderLeft: '1px solid var(--border-2)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-lg)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 'var(--r)', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="bot" size={16} />
+                </div>
                 <div>
-                  <h4>BrewHive AI Co-Pilot</h4>
-                  <p>● Doğal dille stok ve ciro asistanınız</p>
+                  <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>BrewHive AI Co-Pilot</h4>
+                  <p style={{ fontSize: 10, color: 'var(--green)' }}>● Çevrimiçi · Doğal Dil Danışmanı</p>
                 </div>
               </div>
-              <button className="icon-btn" onClick={() => setIsChatOpen(false)}><Icon name="close" size={16} /></button>
+              <button className="icon-btn" onClick={() => setIsChatOpen(false)}>
+                <Icon name="close" size={16} />
+              </button>
             </div>
-            <Chat compact={false} />
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <Chat />
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
