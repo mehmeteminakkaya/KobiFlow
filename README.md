@@ -1,150 +1,89 @@
 <div align="center">
 
-# 🤖 Nexus AI — KOBİ Operasyon & Finans Asistanı
+# ☕ BrewHive AI — Artisan Kahve Zinciri & Akıllı Kafe Operasyon Platformu
 
-[![Google Hackathon Finalist](https://img.shields.io/badge/YZTA%205.0-Hackathon%20Finalist-gold?style=for-the-badge&logo=google&logoColor=white)](https://github.com/mehmeteminakkaya/Nexus-Proje)
-[![Backend](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.11-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Frontend](https://img.shields.io/badge/Frontend-React%20%7C%20Vite%20%7C%20Tailwind-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![AI Models](https://img.shields.io/badge/AI%20Engine-NVIDIA%20NIM%20%7C%20Mistral%20%7C%20Llama%203.3-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://build.nvidia.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![Google Hackathon](https://img.shields.io/badge/Google%20AI%20Hackathon-Finalist%20Award-gold?style=for-the-badge&logo=google&logoColor=white)](https://brewhive-ai.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Canl%C4%B1%20Uygulama-brewhive--ai.vercel.app-11130f?style=for-the-badge&logo=vercel&logoColor=white)](https://brewhive-ai.vercel.app)
+[![Tech Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20React%20%7C%20NVIDIA%20NIM%20%7C%20Gemini%20OCR-orange?style=for-the-badge)](https://brewhive-ai.vercel.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <strong>KOBİ'lerin günlük operasyonlarını ve finansal kararlarını otonomlaştıran yapay zekâ asistanı.</strong><br>
-  Yönetici Türkçe konuşur; Nexus sorgular, analiz eder, faturaları OCR ile okur ve anında aksiyon alır.
+  <strong>İstanbul'daki 3 şubeli (Kadıköy, Beşiktaş, Şişli) ve B2B kurumsal müşterilere sahip bir kahve zincirinin stok, ciro, fatura OCR ve lojistik operasyonlarını otonomlaştıran yeni nesil yapay zekâ platformu.</strong>
 </p>
 
-[Canlı Demo](#-demo) • [Sistem Mimarisi](#%EF%B8%8F-sistem-mimarisi) • [Hızlı Kurulum](#-h%C4%B1zl%C4%B1-kurulum) • [Geliştirici](#-geli%C5%9Ftirici)
+[Canlı Uygulamayı İncele ➔](https://brewhive-ai.vercel.app) • [Geliştirici Portfolyosu ↗](https://mehmeteminakkaya.com) • [LinkedIn](https://www.linkedin.com/in/mehmeteminakkaya/)
 
 ---
 
 </div>
 
-## 🎯 Problem & Çözüm
+## 🌟 BrewHive AI Nedir?
 
-Küçük ve orta ölçekli işletmeler (KOBİ) her gün 2-3 saatini "Hangi sipariş gecikti?", "Kritik stokta ne kaldı?", "Faturadaki ürünleri stoka nasıl işlerim?" gibi operasyonel işlere harcıyor.
+**BrewHive AI**, kafe yöneticilerinin ve barista müdürlerinin karmaşık operasyonel kararlarını hızlandırmak için geliştirilmiş dikey bir **SaaS & AI Co-Pilot** sistemidir.
 
-**Nexus AI**, tüm bu süreci tek bir doğal dil arayüzüne indirger:
+Klasik gösterge panellerinin aksine BrewHive AI sadece veri listelemez; **doğal dil ile emir alır, toptancı faturalarını görselden okur, şubeler arası stok tükenme sürelerini tahmin eder ve aksiyon alır.**
 
 ```text
-🗣️ "Bugün kaç sipariş var?"         ➔ Anlık sipariş listesi & özet
-⚠️ "Kritik stokta ne var?"          ➔ Tükenme riski olan ürünler ve tahmin günü
-🔄 "128 nolu siparişi iptal et"     ➔ Veritabanını anında günceller
-🧾 [Fatura Görseli Yükle]           ➔ OCR ile satırları okur, stoka otomatik işler
-📊 "Bu hafta en çok ne sattık?"     ➔ Anlık analiz, ciro grafiği ve trend raporu
+"Kadıköy şubesinde yulaf sütü stoğu kaç kaldı?"   ➔ Anlık stok + 18 saatlik tükenme uyarısı verir.
+"Bugün en çok ciro yapan şubeyi raporla"          ➔ Şube karşılaştırmalı analitik dökümü çıkarır.
+"Toptancı kahve faturasını sisteme işle"          ➔ OCR ile çuvalları ayrıştırır, tek tıkla stoğa yansıtır.
 ```
 
 ---
 
-## 🏗️ Sistem Mimarisi
+## ✨ Temel Modüller & Fonksiyonlar
+
+| Modül | Açıklama |
+| :--- | :--- |
+| 📊 **Canlı Şube Dashboard'u** | Kadıköy, Beşiktaş ve Şişli şubelerinin anlık ciro, sipariş ve kritik hammadde göstergeleri. |
+| ☕ **Hammadde & Çekirdek Envanteri** | Kahve çekirdeği, süt, şurup ve pastane ürünlerinin şube bazlı stok takibi ve hızlı ekleme/çıkarma. |
+| 📦 **Sipariş & Lojistik Akışı** | Masalardan ve B2B kurumsal müşterilerden gelen siparişler, kargo takip numaraları ve durum yönetimi. |
+| 🤖 **BrewHive AI Asistan (Co-Pilot)** | Doğal dil ile veritabanı sorgulayan, sesli komut alan ve operasyonel kararları hızlandıran yapay zekâ ajanı. |
+| 🧾 **Akıllı Fatura OCR Tarayıcısı** | Toptancıdan gelen kahve ve süt faturalarını Gemini OCR ile okuyup otomatik stoğa aktarma. |
+| 🔮 **Talep & Stok Tahmin Motoru** | Tüketim hızına göre stok bitiş gününü (Runout Days) hesaplayan ve otomatik tedarik öneren algoritma. |
+
+---
+
+## 🏗️ Mimari & Veri Akışı
 
 ```mermaid
 graph TD
-    User([Kullanıcı / KOBİ Yöneticisi]) <-->|WebSocket + REST| Frontend[React + Vite Dashboard]
-    
-    subgraph "FastAPI Asenkron Backend"
-        Router[FastAPI API Router]
-        Auth[JWT Kimlik Doğrulama]
-        Agent[AI Agent Pre-fetch Engine]
-        Insight[APScheduler Proaktif Motor]
-        OCR[Tesseract OCR + Vision Engine]
-        RAG[LangChain + FAISS Vektör Belleği]
-        Sim[Gerçek Zamanlı Sipariş Simülatörü]
-        
-        Router --> Auth
-        Router --> Agent
-        Router --> Insight
-        Router --> OCR
-        Router --> RAG
-        Router --> Sim
-    end
-
-    subgraph "Veri & Model Katmanı"
-        DB[(SQLite / PostgreSQL via SQLAlchemy)]
-        NvidiaAPI[NVIDIA NIM: Mistral Nemo 12B & Llama 3.3 70B]
-    end
-
-    Agent <--> NvidiaAPI
-    Agent <--> DB
-    Insight <--> DB
-    Insight -->|Anlık Push| Frontend
-    OCR --> DB
+    User([Yönetici / Barista Müdürü]) <-->|React + Tailwind UI| WebApp[BrewHive Frontend · Vercel]
+    WebApp <-->|REST API & WebSockets| Backend[FastAPI Backend Engine]
+    Backend <-->|SQLAlchemy ORM| DB[(SQLite / PostgreSQL DB)]
+    Backend <-->|Function Calling & Reasoning| LLM[NVIDIA NIM & Llama 3.3]
+    Backend <-->|Document & Receipt Parsing| OCR[Gemini 1.5 Flash OCR]
+    Backend <-->|Realtime Alerts| Scheduler[APScheduler & Live Simulation]
 ```
 
 ---
 
-## ✨ Öne Çıkan Özellikler
+## 🚀 Hızlı Başlangıç & Yerel Kurulum
 
-| Modül | Özellik | Açıklama |
-| :--- | :--- | :--- |
-| 💬 **AI Operasyon Chat** | Doğal Dil Arayüzü | Sipariş, stok, müşteri sorgularında streaming Türkçe yanıt |
-| 📊 **Canlı Dashboard** | Finans & Ciro | Anlık özet: bekleyen siparişler, kritik stoklar, günlük ciro |
-| 🔔 **Proaktif AI Motoru** | APScheduler | 5 dakikada bir otomatik stok ve gecikme analizi üretir |
-| 🧾 **Otomatik Fatura OCR** | Vision + Tesseract | Fatura görselindeki kalemleri okuyup tek tıkla stoka işler |
-| 📈 **Akıllı Stok Tahmini** | Trend Algoritması | Son 30 günlük satış trendine göre tükenme gününü hesaplar |
-| ⚡ **Canlı Simülasyon** | Real-time Engine | 90 saniyede bir gerçekçi kargo ve sipariş hareketleri simüle eder |
-| 🔐 **Güvenlik & Rol** | JWT Auth | Token tabanlı yönetici ve personel yetkilendirmesi |
-
----
-
-## 🚀 Hızlı Kurulum
-
-### Ön Koşullar
-* Python 3.10+
-* Node.js 18+
-* [NVIDIA NIM API Key](https://build.nvidia.com/)
-* *(Opsiyonel)* Windows için [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
-
-### 1. Tek Tıkla Başlatma (Windows)
-```cmd
-# Depo kökündeki başlatıcıyı çalıştırın:
-baslat.bat
-```
-
-### 2. Manuel Kurulum Adımları
-
-#### Backend Kurulumu:
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate      # Windows: venv\Scripts\activate (Mac/Linux: source venv/bin/activate)
-
-pip install -r requirements.txt
-
-cp .env.example .env
-# .env dosyasına NVIDIA_API_KEY ve JWT_SECRET değerlerinizi girin
-
-python main.py
-# ➔ Backend http://localhost:8000 adresinde ayağa kalkar.
-```
-
-#### Frontend Kurulumu:
+### 1. Web Uygulamasını Başlatma (Frontend):
 ```bash
 cd frontend
 npm install
 npm run dev
-# ➔ Frontend http://localhost:5173 adresinde açılır.
+# ➔ http://localhost:5173 adresinde açılır
 ```
 
-#### 🔑 Varsayılan Giriş Bilgileri:
-* **Kullanıcı Adı:** `admin`
-* **Şifre:** `admin123`
-*(İlk açılışta 8 müşteri, 32 ürün ve 100 siparişlik demo verisi otomatik oluşturulur).*
+### 2. Backend Servisini Başlatma (Python):
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate # Mac/Linux: source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+# ➔ API http://localhost:8000 adresinde ayağa kalkar
+```
 
 ---
 
-## 🛠️ Teknoloji Yığını
-
-* **Backend:** FastAPI, Python 3.11, SQLAlchemy, SQLite, APScheduler, LangChain, FAISS, Tesseract OCR
-* **AI & LLM:** NVIDIA NIM API (Mistral-Nemo-12B-Instruct, Llama-3.3-70B-Instruct, NV-EmbedQA-E5)
-* **Frontend:** React 18, Vite, Recharts, Tailwind CSS, Native WebSockets
-* **DevOps:** Batch scripting, Git, CORS & JWT Security
-
----
-
-## 👤 Geliştirici & İletişim
+## 👨‍💻 Geliştirici & İletişim
 
 **Mehmet Emin Akkaya**  
-*İstinye Üniversitesi Bilgisayar Mühendisliği | Google Yapay Zeka ve Teknoloji Akademisi Bursiyeri*
+*İstinye Üniversitesi Bilgisayar Mühendisliği | Google Yapay Zeka Akademisi Bursiyeri*
 
 * 🌐 **Portfolyo:** [mehmeteminakkaya.com](https://mehmeteminakkaya.com)
 * 💼 **LinkedIn:** [linkedin.com/in/mehmeteminakkaya](https://www.linkedin.com/in/mehmeteminakkaya/)
@@ -154,5 +93,5 @@ npm run dev
 ---
 
 <div align="center">
-  <sub>YZTA 5.0 AI Hackathon Finalist Projesi. Telif Hakkı © 2026.</sub>
+  <sub>Telif Hakkı © 2026 Mehmet Emin Akkaya · BrewHive AI. Tüm hakları saklıdır.</sub>
 </div>

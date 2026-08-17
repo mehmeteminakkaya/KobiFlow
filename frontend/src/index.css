@@ -22,12 +22,14 @@
   --text-3:    #5c6478;
   --text-4:    #3a4154;
 
-  /* accent (single, refined indigo) */
-  --accent:       #6e7bff;
-  --accent-2:     #8b95ff;
-  --accent-soft:  rgba(110,123,255,0.10);
-  --accent-soft2: rgba(110,123,255,0.18);
-  --accent-border:rgba(110,123,255,0.28);
+  /* accent (Specialty Coffee Amber & Caramel) */
+  --accent:       #d97706;
+  --accent-2:     #f59e0b;
+  --accent-soft:  rgba(217,119,6,0.12);
+  --accent-soft2: rgba(245,158,11,0.20);
+  --accent-border:rgba(245,158,11,0.30);
+  --coffee-dark:  #181512;
+  --coffee-foam:  #e6c8a2;
 
   /* semantic */
   --green:        #34d399;
