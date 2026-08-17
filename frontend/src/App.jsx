@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
@@ -15,44 +13,39 @@ import {
   SAMPLE_OCR_INVOICE
 } from './mockData.js'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// ── Database Persistence Layer ──────────────────────────────
+const DB_KEY_PRODUCTS = 'kobiflow_db_products_v3'
+const DB_KEY_ORDERS   = 'kobiflow_db_orders_v3'
+const DB_KEY_INSIGHTS = 'kobiflow_db_insights_v3'
+const DB_KEY_USERS    = 'kobiflow_db_users_v3'
 
-// ── Database Sync Layer ─────────────────────────────────────
-const DB_STORAGE_KEY_PRODUCTS = 'brewhive_db_products_v2'
-const DB_STORAGE_KEY_ORDERS   = 'brewhive_db_orders_v2'
-const DB_STORAGE_KEY_INSIGHTS = 'brewhive_db_insights_v2'
-const DB_STORAGE_KEY_USERS    = 'brewhive_db_users_v2'
-
-function loadFromDb(key, defaultVal) {
+function getFromStorage(key, fallback) {
   try {
-    const saved = localStorage.getItem(key)
-    if (saved) return JSON.parse(saved)
+    const data = localStorage.getItem(key)
+    if (data) return JSON.parse(data)
   } catch {}
-  return defaultVal
+  return fallback
 }
 
-function saveToDb(key, val) {
+function saveToStorage(key, data) {
   try {
-    localStorage.setItem(key, JSON.stringify(val))
+    localStorage.setItem(key, JSON.stringify(data))
   } catch {}
 }
 
 // ── Icon Library (inline SVG) ──────────────────────────────
 const ICON_PATHS = {
-  coffee:       <><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></>,
-  store:        <><path d="M3 7l1.5-3h15L21 7"/><path d="M3 7v13h18V7"/><path d="M3 7h18"/><path d="M8 11v3a4 4 0 008 0v-3"/></>,
+  briefcase:    <><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></>,
+  building:     <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></>,
+  boxes:        <><path d="M2.97 12.92A2 2 0 002 14.63v3.24A2.13 2.13 0 004.13 20h15.74A2.13 2.13 0 0022 17.87v-3.24a2 2 0 00-.97-1.71l-8-4.57a2 2 0 00-2.06 0l-8 4.57z"/><path d="M12 5.4v5.6"/><path d="M12 11l8 4.5"/><path d="M12 11L4 15.5"/><path d="M7 3.34l5 2.85 5-2.85"/></>,
   bell:         <><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></>,
   power:        <><path d="M18.36 6.64a9 9 0 11-12.72 0"/><line x1="12" y1="2" x2="12" y2="12"/></>,
   user:         <><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0114 0v1"/></>,
   search:       <><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-  send:         <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
-  mic:          <><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0"/><line x1="12" y1="18" x2="12" y2="22"/></>,
   close:        <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
   check:        <><polyline points="20 6 9 17 4 12"/></>,
   plus:         <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
   trash:        <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1.5 14a2 2 0 01-2 2H8.5a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2"/></>,
-  play:         <><polygon points="6 4 20 12 6 20 6 4"/></>,
-  refresh:      <><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10"/><path d="M20.49 15A9 9 0 015.64 18.36L1 14"/></>,
   alertCircle:  <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
   alertTriangle:<><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
   info:         <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
@@ -60,19 +53,16 @@ const ICON_PATHS = {
   trendingUp:   <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
   trendingDown: <><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></>,
   package:      <><path d="M16.5 9.4L7.55 4.24"/><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
-  truck:        <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
-  clock:        <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+  truck:        <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
   layoutDash:   <><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></>,
   barChart:     <><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
-  sparkles:     <><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z"/><path d="M5 16l.75 2.25L8 19l-2.25.75L5 22l-.75-2.25L2 19l2.25-.75L5 16z"/></>,
-  scan:         <><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></>,
-  database:     <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></>,
-  bot:          <><rect x="3" y="8" width="18" height="12" rx="2"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/><line x1="12" y1="4" x2="12" y2="8"/><circle cx="12" cy="3" r="1"/><line x1="3" y1="14" x2="2" y2="14"/><line x1="22" y1="14" x2="21" y2="14"/></>,
+  fileText:     <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
   cloudUpload:  <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/><polyline points="16 16 12 12 8 16"/></>,
+  scan:         <><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></>,
 }
 
 function Icon({ name, size = 16, className = '', style }) {
-  const path = ICON_PATHS[name] || ICON_PATHS.coffee
+  const path = ICON_PATHS[name] || ICON_PATHS.briefcase
   return (
     <svg
       width={size}
@@ -93,16 +83,16 @@ function Icon({ name, size = 16, className = '', style }) {
 }
 
 const STATUS = {
-  pending:   { label: 'Bekliyor',     cls: 'badge-pending' },
-  shipped:   { label: 'Kargoda/Yolda',cls: 'badge-shipped' },
-  delivered: { label: 'Teslim Edildi',cls: 'badge-delivered' },
-  cancelled: { label: 'İptal Edildi', cls: 'badge-cancelled' },
+  pending:   { label: 'Onay Bekliyor', cls: 'badge-pending' },
+  shipped:   { label: 'Sevkiyatta',    cls: 'badge-shipped' },
+  delivered: { label: 'Teslim Edildi', cls: 'badge-delivered' },
+  cancelled: { label: 'İptal',         cls: 'badge-cancelled' },
 }
 
 const SEVERITY_CONFIG = {
   critical: { color: '#f87171', bg: 'rgba(248,113,113,0.10)', iconName: 'alertCircle',   label: 'Kritik Stok' },
   warning:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)',  iconName: 'alertTriangle', label: 'Operasyonel Uyarı' },
-  info:     { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  iconName: 'info',          label: 'Fırsat & Trend' },
+  info:     { color: '#60a5fa', bg: 'rgba(96,165,250,0.10)',  iconName: 'info',          label: 'Mali Bildirim' },
   success:  { color: '#34d399', bg: 'rgba(52,211,153,0.10)',  iconName: 'checkCircle',   label: 'Yüksek Performans' },
 }
 
@@ -116,47 +106,47 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff/86400)}g önce`
 }
 
-// ── Real Auth Screen (Login & Business Registration) ────────
+// ── Auth Screen: Clean Giriş Yap & Kayıt Ol ──────────────────
 function AuthScreen({ onLogin }) {
   const [tab, setTab] = useState('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
+  const [fullName, setFullName] = useState('')
   const [error, setError] = useState('')
 
   const handleAuth = (e) => {
     e.preventDefault()
     setError('')
 
-    const users = loadFromDb(DB_STORAGE_KEY_USERS, [
-      { username: 'admin', password: 'password', role: 'Genel Koordinatör', business: 'BrewHive Coffee Roasters' }
+    const users = getFromStorage(DB_KEY_USERS, [
+      { username: 'admin', password: 'password', fullName: 'Mehmet Emin Akkaya', role: 'Genel Koordinatör', business: 'KobiFlow Merkez Operasyon' }
     ])
 
     if (tab === 'login') {
       const match = users.find(u => u.username === username.trim() && u.password === password)
       if (match || (username === 'admin' && password === 'admin123')) {
-        const u = match || { username: 'admin', role: 'Genel Koordinatör', business: 'BrewHive Coffee Roasters' }
-        localStorage.setItem('brewhive_session_token', 'bh_live_' + Date.now())
-        localStorage.setItem('user', JSON.stringify(u))
+        const u = match || { username: 'admin', fullName: 'Mehmet Emin Akkaya', role: 'Genel Koordinatör', business: 'KobiFlow Merkez Operasyon' }
+        localStorage.setItem('kobiflow_user', JSON.stringify(u))
         onLogin(u)
       } else {
         setError('Hatalı kullanıcı adı veya şifre girdiniz.')
       }
     } else {
       if (users.find(u => u.username === username.trim())) {
-        setError('Bu kullanıcı adı zaten kayıtlı.')
+        setError('Bu kullanıcı adı zaten sistemde kayıtlı.')
         return
       }
       const newUser = {
         username: username.trim(),
         password: password,
+        fullName: fullName.trim() || username.trim(),
         role: 'İşletme Yöneticisi',
-        business: businessName.trim() || 'Özel Kahve Şubesi'
+        business: businessName.trim() || 'Ticari İşletme'
       }
       users.push(newUser)
-      saveToDb(DB_STORAGE_KEY_USERS, users)
-      localStorage.setItem('brewhive_session_token', 'bh_live_' + Date.now())
-      localStorage.setItem('user', JSON.stringify(newUser))
+      saveToStorage(DB_KEY_USERS, users)
+      localStorage.setItem('kobiflow_user', JSON.stringify(newUser))
       onLogin(newUser)
     }
   }
@@ -165,19 +155,19 @@ function AuthScreen({ onLogin }) {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="logo-icon" style={{ width: 48, height: 48, margin: '0 auto 12px' }}>
-            <Icon name="coffee" size={26} />
+          <div className="logo-icon" style={{ width: 44, height: 44, margin: '0 auto 12px', background: 'var(--accent)', color: '#fff' }}>
+            <Icon name="briefcase" size={22} />
           </div>
-          <h1>BrewHive AI</h1>
-          <p>KOBİ &amp; Kahve Zinciri Operasyon Platformu</p>
+          <h1>KobiFlow</h1>
+          <p>KOBİ Operasyon &amp; Envanter Yönetim Platformu</p>
         </div>
 
         <div className="auth-tabs">
           <button type="button" className={tab === 'login' ? 'active' : ''} onClick={() => { setTab('login'); setError('') }}>
-            Yönetici Girişi
+            Giriş Yap
           </button>
           <button type="button" className={tab === 'register' ? 'active' : ''} onClick={() => { setTab('register'); setError('') }}>
-            Yeni İşletme Kaydı
+            Kayıt Ol
           </button>
         </div>
 
@@ -185,13 +175,22 @@ function AuthScreen({ onLogin }) {
 
         <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {tab === 'register' && (
-            <input
-              className="auth-input"
-              value={businessName}
-              onChange={e => setBusinessName(e.target.value)}
-              placeholder="İşletme / Kafe Adı (Örn: Moda Roast Cafe)"
-              required
-            />
+            <>
+              <input
+                className="auth-input"
+                value={businessName}
+                onChange={e => setBusinessName(e.target.value)}
+                placeholder="Şirket / İşletme Ünvanı"
+                required
+              />
+              <input
+                className="auth-input"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Yetkili Adı Soyadı"
+                required
+              />
+            </>
           )}
           <input
             className="auth-input"
@@ -209,11 +208,11 @@ function AuthScreen({ onLogin }) {
             required
           />
           <button type="submit" className="auth-btn">
-            {tab === 'login' ? 'Giriş Yap ➔' : 'İşletmeyi Oluştur ve Başla ➔'}
+            {tab === 'login' ? 'Giriş Yap ➔' : 'Hesap Oluştur ve Başla ➔'}
           </button>
         </form>
 
-        <p className="auth-hint">Kurumsal KOBİ veritabanına doğrudan bağlıdır.</p>
+        <p className="auth-hint">Kurumsal KOBİ operasyon ve fatura altyapısı.</p>
       </div>
     </div>
   )
@@ -228,7 +227,7 @@ function NotificationCenter({ insights, onClose }) {
       borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-lg)', padding: '14px 16px'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h4 style={{ fontSize: 13, fontWeight: 600 }}>Operasyon Alarmları</h4>
+        <h4 style={{ fontSize: 13, fontWeight: 600 }}>Operasyonel Alarmlar</h4>
         <button onClick={onClose} className="icon-btn"><Icon name="close" size={14} /></button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -251,7 +250,7 @@ function NotificationCenter({ insights, onClose }) {
   )
 }
 
-// ── View 1: Dashboard ───────────────────────────────────────
+// ── View 1: Dashboard (Genel Bakış) ─────────────────────────
 function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
   const branchOrders = selectedBranch === 'Tümü' 
     ? orders 
@@ -264,33 +263,33 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
   return (
     <div className="view">
       <div className="stats-grid">
-        <div className="stat-card yellow">
-          <div className="stat-icon"><Icon name="coffee" size={18} /></div>
-          <div className="revenue-badge up"><Icon name="trendingUp" size={11} /> +18.4%</div>
+        <div className="stat-card cyan">
+          <div className="stat-icon"><Icon name="briefcase" size={18} /></div>
+          <div className="revenue-badge up"><Icon name="trendingUp" size={11} /> +24.6%</div>
           <div className="stat-value">₺{totalRevenue.toLocaleString('tr-TR')}</div>
-          <div className="stat-label">Toplam Ciro (Bugün)</div>
-          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli toplamı</div>
+          <div className="stat-label">Toplam Ticari Hacim</div>
+          <div className="stat-trend">Aktif dönem tahsilat &amp; sipariş</div>
         </div>
 
-        <div className="stat-card cyan">
+        <div className="stat-card yellow">
           <div className="stat-icon"><Icon name="package" size={18} /></div>
           <div className="stat-value">{pendingOrders.length} Sipariş</div>
-          <div className="stat-label">Bekleyen / Hazırlanan</div>
-          <div className="stat-trend">Ortalama servis süresi: 4.8 dk</div>
+          <div className="stat-label">Sevkiyat Bekleyen</div>
+          <div className="stat-trend">Hazırlık aşamasındaki kalemler</div>
         </div>
 
         <div className="stat-card red">
           <div className="stat-icon"><Icon name="alertCircle" size={18} /></div>
-          <div className="stat-value">{criticalStock.length} Kalem</div>
+          <div className="stat-value">{criticalStock.length} Ürün</div>
           <div className="stat-label">Kritik Stok Uyarısı</div>
-          <div className="stat-trend">Yulaf sütü &amp; Kruvasan acil</div>
+          <div className="stat-trend">Tedarik eşiğinin altındaki malzemeler</div>
         </div>
 
         <div className="stat-card green">
-          <div className="stat-icon"><Icon name="store" size={18} /></div>
-          <div className="stat-value">3 Şube + B2B</div>
-          <div className="stat-label">Aktif Şube Ağı</div>
-          <div className="stat-trend">Kadıköy, Beşiktaş, Şişli</div>
+          <div className="stat-icon"><Icon name="building" size={18} /></div>
+          <div className="stat-value">4 Depo / Şube</div>
+          <div className="stat-label">Entegre Şube Ağı</div>
+          <div className="stat-trend">Merkez Depo, Kadıköy, Levent, Ankara</div>
         </div>
       </div>
 
@@ -298,19 +297,19 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title"><Icon name="barChart" size={15} /> Haftalık Şube Gelir Dağılımı</div>
-              <div className="panel-subtitle">Kadıköy, Beşiktaş ve Şişli anlık ciro dağılımı</div>
+              <div className="panel-title"><Icon name="barChart" size={15} /> Haftalık Ticari Ciro Dağılımı</div>
+              <div className="panel-subtitle">Depo ve şube bazlı gelir akışı (₺)</div>
             </div>
           </div>
           <div className="panel-body" style={{ height: 260, padding: '16px 14px 4px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={REVENUE_CHART_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorKdk" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d97706" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#d97706" stopOpacity={0.0}/>
+                  <linearGradient id="colorMerkez" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
                   </linearGradient>
-                  <linearGradient id="colorBsk" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorSubeler" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
                   </linearGradient>
@@ -319,8 +318,8 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
                 <XAxis dataKey="day" stroke="var(--text-3)" fontSize={12} />
                 <YAxis stroke="var(--text-3)" fontSize={12} tickFormatter={v => `₺${v/1000}k`} />
                 <Tooltip contentStyle={{ background: '#16181f', border: '1px solid var(--border)', borderRadius: 8 }} formatter={v => [`₺${v.toLocaleString('tr-TR')}`, '']} />
-                <Area type="monotone" dataKey="kadikoy" name="Kadıköy" stroke="#d97706" fillOpacity={1} fill="url(#colorKdk)" />
-                <Area type="monotone" dataKey="besiktas" name="Beşiktaş" stroke="#10b981" fillOpacity={1} fill="url(#colorBsk)" />
+                <Area type="monotone" dataKey="merkez" name="Merkez Depo" stroke="#3b82f6" fillOpacity={1} fill="url(#colorMerkez)" />
+                <Area type="monotone" dataKey="subeler" name="Şubeler" stroke="#10b981" fillOpacity={1} fill="url(#colorSubeler)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -329,13 +328,13 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title"><Icon name="alertTriangle" size={15} /> Kritik Hammadde Alarmları</div>
-              <div className="panel-subtitle">Tükenme riski olan ürünler</div>
+              <div className="panel-title"><Icon name="alertTriangle" size={15} /> Kritik Envanter Bildirimleri</div>
+              <div className="panel-subtitle">Tedarik süresi yaklaşan ürünler</div>
             </div>
           </div>
           <div className="panel-body" style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {criticalStock.length === 0 ? (
-              <p style={{ color: 'var(--green)', fontSize: 13, padding: 12 }}>Tüm hammadde ve ürün stokları güvenli seviyede. ✓</p>
+              <p style={{ color: 'var(--green)', fontSize: 13, padding: 12 }}>Tüm envanter ve hammadde stokları güvenli seviyede. ✓</p>
             ) : (
               criticalStock.map((prod, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
@@ -356,8 +355,8 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
       <div className="panel" style={{ marginTop: 16 }}>
         <div className="panel-header">
           <div>
-            <div className="panel-title"><Icon name="package" size={15} /> Güncel Siparişler</div>
-            <div className="panel-subtitle">Şubelerden ve B2B müşterilerden gelen sipariş kayıtları</div>
+            <div className="panel-title"><Icon name="package" size={15} /> Güncel Ticari Siparişler</div>
+            <div className="panel-subtitle">B2B kurumsal müşterilerden ve şubelerden gelen kayıtlar</div>
           </div>
         </div>
         <div className="panel-body">
@@ -365,11 +364,11 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
             <thead>
               <tr>
                 <th>Sipariş No</th>
-                <th>Müşteri / Şube</th>
-                <th>Kalemler</th>
+                <th>Müşteri / Kurum</th>
+                <th>Sipariş Kalemleri</th>
                 <th>Tutar</th>
                 <th>Durum</th>
-                <th>Zaman</th>
+                <th>Tarih</th>
               </tr>
             </thead>
             <tbody>
@@ -377,7 +376,7 @@ function Dashboard({ products, orders, selectedBranch, onQuickStockAdd }) {
                 <tr key={o.id}>
                   <td><strong>#{o.id}</strong></td>
                   <td>{o.customer}</td>
-                  <td>{o.items?.map(it => `${it.product_name} (${it.quantity})`).join(', ') || 'Kahve & Tatlı'}</td>
+                  <td>{o.items?.map(it => `${it.product_name} (${it.quantity} adet)`).join(', ') || 'Ticari Sipariş'}</td>
                   <td><strong>₺{o.total_amount?.toLocaleString('tr-TR')}</strong></td>
                   <td><span className={`badge ${STATUS[o.status]?.cls}`}>{STATUS[o.status]?.label}</span></td>
                   <td>{timeAgo(o.created_at)}</td>
@@ -399,8 +398,8 @@ function Analytics() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title"><Icon name="barChart" size={15} /> Kategori Bazlı Satış Hacmi</div>
-              <div className="panel-subtitle">Haftalık sipariş dağılım yüzdeleri</div>
+              <div className="panel-title"><Icon name="barChart" size={15} /> Kategori Bazlı Satış Dağılımı</div>
+              <div className="panel-subtitle">Ürün gruplarının toplam hacim içindeki payı</div>
             </div>
           </div>
           <div className="panel-body" style={{ height: 280, padding: 16 }}>
@@ -420,16 +419,16 @@ function Analytics() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <div className="panel-title"><Icon name="sparkles" size={15} /> Günün En Çok Satanları</div>
-              <div className="panel-subtitle">Adet bazında lider ürünler</div>
+              <div className="panel-title"><Icon name="boxes" size={15} /> En Yüksek Hacimli Ürünler</div>
+              <div className="panel-subtitle">Haftalık sevkiyat liderleri</div>
             </div>
           </div>
           <div className="panel-body" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>1. Double Espresso</span><strong>520 Porsiyon</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>2. Filtre Kahve (Guatemala)</span><strong>480 Porsiyon</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>3. Doğu Karadeniz Çayı</span><strong>420 Bardak</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>4. Iced Americano</span><strong>350 Porsiyon</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>5. Belçika Sıcak Çikolata</span><strong>310 Porsiyon</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>1. Endüstriyel Streç Film (50cm x 300m)</span><strong>450 Rulo</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>2. Çift Taraflı Montaj Bandı (50m)</span><strong>310 Adet</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>3. Paslanmaz Civata Seti (M8x40)</span><strong>210 Paket</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}><span>4. Katlanır Plastik Taşıma Kasası</span><strong>160 Adet</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>5. A4 Fotokopi Kağıdı 80gr (Koli)</span><strong>120 Koli</strong></div>
           </div>
         </div>
       </div>
@@ -442,10 +441,10 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
   const [filter, setFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [customer, setCustomer] = useState('')
-  const [branch, setBranch] = useState('Kadıköy')
-  const [productName, setProductName] = useState('Double Espresso')
-  const [quantity, setQuantity] = useState(2)
-  const [amount, setAmount] = useState(160)
+  const [branch, setBranch] = useState('Merkez Depo')
+  const [productName, setProductName] = useState('Endüstriyel Streç Film')
+  const [quantity, setQuantity] = useState(10)
+  const [amount, setAmount] = useState(2850)
 
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
 
@@ -453,14 +452,14 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
     e.preventDefault()
     if (!customer.trim()) return
     onNewOrder({
-      id: Math.floor(1000 + Math.random() * 9000),
+      id: Math.floor(10000 + Math.random() * 90000),
       customer: customer.trim(),
       branch: branch,
-      total_amount: Number(amount) || 160,
+      total_amount: Number(amount) || 2850,
       status: 'pending',
       created_at: new Date().toISOString(),
       items: [{ product_name: productName, quantity: Number(quantity), unit_price: Number(amount)/Number(quantity) }],
-      shipment: { carrier: 'Şube Kuryesi', tracking: `BH-${branch.slice(0,3).toUpperCase()}-${Math.floor(100+Math.random()*900)}` }
+      shipment: { carrier: 'Yurtiçi Lojistik', tracking: `YRT-${Math.floor(100000+Math.random()*900000)}` }
     })
     setShowModal(false)
     setCustomer('')
@@ -471,8 +470,8 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
       <div className="panel">
         <div className="panel-header">
           <div>
-            <div className="panel-title"><Icon name="package" size={15} /> Sipariş &amp; Lojistik Yönetimi</div>
-            <div className="panel-subtitle">Şube transferleri ve müşteri siparişleri</div>
+            <div className="panel-title"><Icon name="package" size={15} /> Sipariş &amp; Sevkiyat Yönetimi</div>
+            <div className="panel-subtitle">Tüm şube sevkiyatları ve kurumsal müşteri faturaları</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="auth-btn" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setShowModal(true)}>
@@ -496,10 +495,10 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>No</th>
-                <th>Şube / Müşteri</th>
-                <th>Sipariş Detayı</th>
-                <th>Kargo / Kurye</th>
+                <th>Sipariş No</th>
+                <th>Şube / Alıcı Müşteri</th>
+                <th>Kalemler</th>
+                <th>Lojistik Taşıyıcı</th>
                 <th>Tutar</th>
                 <th>Durum</th>
                 <th>Aksiyon</th>
@@ -510,14 +509,14 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
                 <tr key={o.id}>
                   <td><strong>#{o.id}</strong></td>
                   <td>{o.customer} ({o.branch})</td>
-                  <td>{o.items?.map(it => `${it.product_name} x${it.quantity}`).join(', ') || 'Özel Sipariş'}</td>
-                  <td><Icon name="truck" size={12} /> {o.shipment?.carrier || 'Özel Kurye'}</td>
+                  <td>{o.items?.map(it => `${it.product_name} x${it.quantity}`).join(', ') || 'Kurumsal Sipariş'}</td>
+                  <td><Icon name="truck" size={12} /> {o.shipment?.carrier || 'Şube Aracı'}</td>
                   <td><strong>₺{o.total_amount?.toLocaleString('tr-TR')}</strong></td>
                   <td><span className={`badge ${STATUS[o.status]?.cls}`}>{STATUS[o.status]?.label}</span></td>
                   <td>
                     {o.status === 'pending' && (
                       <button className="insight-btn primary" onClick={() => onStatusChange(o.id, 'shipped')}>
-                        Kargoya Ver
+                        Sevkiyata Ver
                       </button>
                     )}
                     {o.status === 'shipped' && (
@@ -538,21 +537,21 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-xl)', padding: 24, width: 440, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Sipariş Kaydı</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Ticari Sipariş Kaydı</h3>
               <button className="icon-btn" onClick={() => setShowModal(false)}><Icon name="close" size={16} /></button>
             </div>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Müşteri / Kurum Adı</label>
-                <input className="auth-input" style={{ marginTop: 4 }} value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Örn: Maslak Plaza Ofisleri" required />
+                <input className="auth-input" style={{ marginTop: 4 }} value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Örn: Aras Endüstri Ltd." required />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>İlgili Şube</label>
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Çıkış Deposu / Şube</label>
                 <select className="auth-input" style={{ marginTop: 4 }} value={branch} onChange={e => setBranch(e.target.value)}>
-                  <option value="Kadıköy">Kadıköy (Moda)</option>
-                  <option value="Beşiktaş">Beşiktaş (Akaretler)</option>
-                  <option value="Şişli">Şişli (Bomonti)</option>
-                  <option value="B2B Kurumsal">B2B Kurumsal Dağıtım</option>
+                  <option value="Merkez Depo">Merkez Depo</option>
+                  <option value="Kadıköy Şube">Kadıköy Şube</option>
+                  <option value="Levent Şube">Levent Şube</option>
+                  <option value="Ankara Şube">Ankara Şube</option>
                 </select>
               </div>
               <div>
@@ -561,7 +560,7 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Adet / Miktar</label>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Miktar</label>
                   <input type="number" className="auth-input" style={{ marginTop: 4 }} value={quantity} onChange={e => setQuantity(e.target.value)} required />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -578,15 +577,15 @@ function Orders({ orders, onStatusChange, onNewOrder }) {
   )
 }
 
-// ── View 4: Products & Inventory ────────────────────────────
+// ── View 4: Products & Inventory (Envanter) ─────────────────
 function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
   const [catFilter, setCatFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('Kahve')
-  const [branch, setBranch] = useState('Kadıköy')
-  const [price, setPrice] = useState(90)
+  const [category, setCategory] = useState('Ambalaj & Paketleme')
+  const [branch, setBranch] = useState('Merkez Depo')
+  const [price, setPrice] = useState(300)
   const [stock, setStock] = useState(100)
   const [minThreshold, setMinThreshold] = useState(25)
 
@@ -602,11 +601,11 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
     e.preventDefault()
     if (!name.trim()) return
     onAddProduct({
-      id: Math.floor(100 + Math.random() * 900),
+      id: Math.floor(1000 + Math.random() * 9000),
       name: name.trim(),
       category,
       branch,
-      price: Number(price) || 90,
+      price: Number(price) || 300,
       stock_quantity: Number(stock) || 100,
       min_stock_threshold: Number(minThreshold) || 20
     })
@@ -619,8 +618,8 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
       <div className="panel">
         <div className="panel-header">
           <div>
-            <div className="panel-title"><Icon name="coffee" size={15} /> Kahve &amp; Hammadde Envanteri</div>
-            <div className="panel-subtitle">Şubelerdeki çekirdek, süt, şurup ve pastane stokları</div>
+            <div className="panel-title"><Icon name="boxes" size={15} /> KOBİ Envanter &amp; Stok Takibi</div>
+            <div className="panel-subtitle">Şubeler ve depolardaki tüm ürün, hammadde ve ticari mallar</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <button className="auth-btn" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setShowAddModal(true)}>
@@ -629,7 +628,7 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
             <input
               className="auth-input"
               style={{ width: 220, padding: '6px 10px', fontSize: 12 }}
-              placeholder="Ürün veya çekirdek ara..."
+              placeholder="Ürün veya malzeme ara..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -652,13 +651,13 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Ürün / Çekirdek</th>
+                <th>Ürün / Malzeme Adı</th>
                 <th>Kategori</th>
-                <th>Şube</th>
+                <th>Bulunduğu Depo</th>
                 <th>Birim Fiyat</th>
                 <th>Mevcut Stok</th>
                 <th>Kritik Eşik</th>
-                <th>Hızlı Ekle / Azalt</th>
+                <th>Hızlı Stok Güncelle</th>
                 <th>İşlem</th>
               </tr>
             </thead>
@@ -702,33 +701,33 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-xl)', padding: 24, width: 440, maxWidth: '90vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Hammadde / Ürün Ekle</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Yeni Ürün / Envanter Ekle</h3>
               <button className="icon-btn" onClick={() => setShowAddModal(false)}><Icon name="close" size={16} /></button>
             </div>
             <form onSubmit={handleCreateProduct} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Ürün Adı</label>
-                <input className="auth-input" style={{ marginTop: 4 }} value={name} onChange={e => setName(e.target.value)} placeholder="Örn: Kolombiya Supremo Çekirdek" required />
+                <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Ürün / Malzeme Adı</label>
+                <input className="auth-input" style={{ marginTop: 4 }} value={name} onChange={e => setName(e.target.value)} placeholder="Örn: A4 Kağıt Koli" required />
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Kategori</label>
                   <select className="auth-input" style={{ marginTop: 4 }} value={category} onChange={e => setCategory(e.target.value)}>
-                    <option value="Kahve">Kahve</option>
-                    <option value="Kahve Çekirdeği">Kahve Çekirdeği</option>
-                    <option value="Çay">Çay</option>
-                    <option value="Unlu Mamüller">Unlu Mamüller</option>
-                    <option value="Şurup">Şurup</option>
-                    <option value="Hammadde">Hammadde</option>
+                    <option value="Ambalaj & Paketleme">Ambalaj &amp; Paketleme</option>
+                    <option value="Ofis & Kırtasiye">Ofis &amp; Kırtasiye</option>
+                    <option value="Teknik Hırdavat">Teknik Hırdavat</option>
+                    <option value="İş Güvenliği">İş Güvenliği</option>
+                    <option value="Elektronik & Donanım">Elektronik &amp; Donanım</option>
+                    <option value="Depolama & Lojistik">Depolama &amp; Lojistik</option>
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Şube</label>
+                  <label style={{ fontSize: 12, color: 'var(--text-3)' }}>Depo / Şube</label>
                   <select className="auth-input" style={{ marginTop: 4 }} value={branch} onChange={e => setBranch(e.target.value)}>
-                    <option value="Kadıköy">Kadıköy</option>
-                    <option value="Beşiktaş">Beşiktaş</option>
-                    <option value="Şişli">Şişli</option>
                     <option value="Merkez Depo">Merkez Depo</option>
+                    <option value="Kadıköy Şube">Kadıköy Şube</option>
+                    <option value="Levent Şube">Levent Şube</option>
+                    <option value="Ankara Şube">Ankara Şube</option>
                   </select>
                 </div>
               </div>
@@ -746,7 +745,7 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
                   <input type="number" className="auth-input" style={{ marginTop: 4 }} value={minThreshold} onChange={e => setMinThreshold(e.target.value)} required />
                 </div>
               </div>
-              <button type="submit" className="auth-btn" style={{ marginTop: 8 }}>Ürünü Stoğa Ekle ➔</button>
+              <button type="submit" className="auth-btn" style={{ marginTop: 8 }}>Ürünü Envantere Kaydet ➔</button>
             </form>
           </div>
         </div>
@@ -755,7 +754,7 @@ function Products({ products, onStockUpdate, onAddProduct, onDeleteProduct }) {
   )
 }
 
-// ── View 5: SmartScan OCR ───────────────────────────────────
+// ── View 5: SmartScan OCR (Fatura & İrsaliye) ────────────────
 function SmartScan({ onAddProductsFromInvoice }) {
   const [invoice, setInvoice] = useState(null)
   const [scanning, setScanning] = useState(false)
@@ -767,16 +766,16 @@ function SmartScan({ onAddProductsFromInvoice }) {
     setScanning(true)
     setTimeout(() => {
       setInvoice({
-        supplier: file.name.replace(/\.[^/.]+$/, "").toUpperCase() + " TEDARİK A.Ş.",
-        invoice_no: `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        supplier: file.name.replace(/\.[^/.]+$/, "").toUpperCase() + " TİC. LTD. ŞTİ.",
+        invoice_no: `FT-2026-${Math.floor(10000 + Math.random() * 90000)}`,
         date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
         items: [
-          { name: "Specialty Kahve Çekirdeği (60kg Çuval)", quantity: 2, unit_price: 18500.0, total: 37000.0 },
-          { name: "Barista Edition Yulaf Sütü (12x1L)", quantity: 15, unit_price: 840.0, total: 12600.0 }
+          { name: "Endüstriyel Streç Film (50cm x 300m)", quantity: 100, unit_price: 260.0, total: 26000.0 },
+          { name: "Termal Barkod Etiketi 100x150", quantity: 50, unit_price: 155.0, total: 7750.0 }
         ],
-        subtotal: 49600.0,
-        tax: 9920.0,
-        grand_total: 59520.0
+        subtotal: 33750.0,
+        tax: 6750.0,
+        grand_total: 40500.0
       })
       setScanning(false)
     }, 1200)
@@ -784,7 +783,7 @@ function SmartScan({ onAddProductsFromInvoice }) {
 
   const handleApply = () => {
     onAddProductsFromInvoice(invoice)
-    alert('Faturadaki kalemler veritabanına ve şube stoklarına kalıcı olarak kaydedildi! ✅')
+    alert('Fatura ve irsaliye kalemleri doğrudan merkez envanterine işlendi! ✅')
   }
 
   return (
@@ -792,8 +791,8 @@ function SmartScan({ onAddProductsFromInvoice }) {
       <div className="panel">
         <div className="panel-header">
           <div>
-            <div className="panel-title"><Icon name="scan" size={15} /> Akıllı Fatura &amp; Fiş OCR Tarayıcısı</div>
-            <div className="panel-subtitle">Toptancı kahve çekirdeği ve süt faturalarını tarayıp doğrudan stoğa aktarın</div>
+            <div className="panel-title"><Icon name="fileText" size={15} /> Tedarikçi Fatura &amp; İrsaliye Tarama (OCR)</div>
+            <div className="panel-subtitle">Toptancı ve tedarikçi faturalarını tarayarak stoklara anında aktarın</div>
           </div>
         </div>
 
@@ -811,10 +810,10 @@ function SmartScan({ onAddProductsFromInvoice }) {
             onClick={() => fileInputRef.current?.click()}
           >
             <div className="empty-icon"><Icon name="cloudUpload" size={28} /></div>
-            <h3>Fatura Görselini veya PDF Dosyasını Seçin</h3>
-            <p style={{ marginBottom: 18 }}>Toptancı faturasındaki ürün adları, miktarlar ve birim fiyatlar yapay zekâ OCR ile anında ayrıştırılır.</p>
+            <h3>Fatura Görselini veya PDF İrsaliyesini Seçin</h3>
+            <p style={{ marginBottom: 18 }}>Yüklenen belgedeki satır kalemleri, adetler ve birim maliyetler otomatik olarak ayrıştırılır.</p>
             <button type="button" className="auth-btn" style={{ padding: '10px 20px', display: 'inline-block' }}>
-              {scanning ? 'OCR Taraması Yapılıyor...' : '📁 Fatura Dosyası Yükle (JPG / PNG / PDF)'}
+              {scanning ? 'OCR Belge Okunuyor...' : '📁 Fatura Yükle (JPG / PNG / PDF)'}
             </button>
           </div>
 
@@ -822,7 +821,7 @@ function SmartScan({ onAddProductsFromInvoice }) {
             <div style={{ marginTop: 24, textAlign: 'left', background: 'var(--bg-2)', border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Tedarikçi: {invoice.supplier}</h4>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Tedarikçi Firma: {invoice.supplier}</h4>
                   <p style={{ fontSize: 11, color: 'var(--text-3)' }}>Fatura No: {invoice.invoice_no} · Tarih: {invoice.date}</p>
                 </div>
                 <button className="insight-btn primary" onClick={handleApply} style={{ padding: '8px 14px', fontSize: 12 }}>
@@ -833,7 +832,7 @@ function SmartScan({ onAddProductsFromInvoice }) {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Ürün Açıklaması</th>
+                    <th>Ürün / Malzeme Açıklaması</th>
                     <th>Miktar</th>
                     <th>Birim Fiyat</th>
                     <th>Toplam Tutar</th>
@@ -858,136 +857,38 @@ function SmartScan({ onAddProductsFromInvoice }) {
   )
 }
 
-// ── View 6: AI Co-Pilot Chat ────────────────────────────────
-function Chat({ products, orders }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Merhaba! Ben **BrewHive AI** operasyon asistanınızım. ☕🐝\n\nKadıköy, Beşiktaş ve Şişli şubelerimizin stok durumunu sorabilir, anlık ciro analizi isteyebilir veya doğrudan sipariş sorgulayabilirsiniz.'
-    }
-  ])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const endRef = useRef(null)
-
-  const send = (msgText) => {
-    const text = msgText || input
-    if (!text.trim() || loading) return
-
-    const userMsg = { role: 'user', content: text }
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
-    setLoading(true)
-
-    setTimeout(() => {
-      let reply = ''
-      const lower = text.toLowerCase()
-
-      if (lower.includes('yulaf') || lower.includes('süt') || lower.includes('kadıköy')) {
-        const p = products.find(prod => prod.name.toLowerCase().includes('yulaf')) || { stock_quantity: 8, min_stock_threshold: 24 }
-        reply = `🥛 **Kadıköy Şubesi Yulaf Sütü Durumu:**\n\n* **Mevcut Stok:** ${p.stock_quantity} Kutu (Kritik Eşik: ${p.min_stock_threshold})\n* **Tükenme Tahmini:** ~18 saat içinde tükenecektir.\n* **Öneri:** Beşiktaş şubesinden 10 kutu transfer oluşturuldu veya toptancı faturası bekleniyor.`
-      } else if (lower.includes('ciro') || lower.includes('satış') || lower.includes('gelir')) {
-        const total = orders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.total_amount : 0), 0)
-        reply = `📊 **Haftalık Ciro Özeti:**\n\n* **Toplam Kayıtlı Ciro:** ₺${total.toLocaleString('tr-TR')}\n* **Lider Şube:** Kadıköy (₺16.800)\n* **En Çok Satan:** Double Espresso & Filtre Kahve (Guatemala)`
-      } else if (lower.includes('sipariş') || lower.includes('bekleyen')) {
-        const pendings = orders.filter(o => o.status === 'pending')
-        reply = `📦 **Bekleyen Siparişler (${pendings.length} Adet):**\n\n` + pendings.slice(0, 3).map(o => `* **#${o.id}** — ${o.customer} (₺${o.total_amount.toLocaleString('tr-TR')})`).join('\n')
-      } else {
-        reply = `☕ **BrewHive AI Danışmanı:**\n\n"${text}" talebiniz gerçek veritabanı üzerinde incelendi. Şube envanterinde ${products.length} ürün ve sistemde ${orders.length} sipariş kayıtlı. Başka bir şube veya stok sorgulamak ister misiniz?`
-      }
-
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
-      setLoading(false)
-    }, 500)
-  }
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="chat-messages">
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            {m.role !== 'user' && (
-              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name="bot" size={14} />
-              </div>
-            )}
-            <div style={{
-              maxWidth: '82%',
-              padding: '10px 14px',
-              borderRadius: 'var(--r-lg)',
-              background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-2)',
-              color: m.role === 'user' ? '#fff' : 'var(--text)',
-              fontSize: 13,
-              lineHeight: 1.5,
-              border: m.role === 'user' ? 'none' : '1px solid var(--border-2)'
-            }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--text-3)', fontSize: 12 }}>
-            <Icon name="bot" size={14} />
-            <span>Yapay zekâ yanıtlıyor...</span>
-          </div>
-        )}
-        <div ref={endRef} />
-      </div>
-
-      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, background: 'var(--bg-1)' }}>
-        <input
-          className="auth-input"
-          style={{ flex: 1 }}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="Örn: Kadıköy yulaf sütü kaç kaldı? Ciro nedir?"
-        />
-        <button className="auth-btn" style={{ padding: '0 16px' }} onClick={() => send()} disabled={!input.trim() || loading}>
-          <Icon name="send" size={15} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ── Main Shell ──────────────────────────────────────────────
 const VIEWS = [
-  { id: 'dashboard', icon: 'layoutDash', label: 'Dashboard', sub: 'Canlı Operasyon' },
-  { id: 'analytics', icon: 'barChart', label: 'Analitik & Tahmin', sub: 'Ciro & Talep' },
-  { id: 'orders', icon: 'package', label: 'Siparişler', sub: 'Şube & Lojistik' },
-  { id: 'products', icon: 'coffee', label: 'Kahve & Stok', sub: 'Envanter' },
-  { id: 'scan', icon: 'scan', label: 'Akıllı Fatura OCR', sub: 'Fatura Girişi' },
+  { id: 'dashboard', icon: 'layoutDash', label: 'Genel Bakış', sub: 'Operasyon Özeti' },
+  { id: 'products', icon: 'boxes', label: 'Envanter & Stok', sub: 'Ürün Kataloğu' },
+  { id: 'orders', icon: 'package', label: 'Sipariş & Sevkiyat', sub: 'Lojistik Takibi' },
+  { id: 'scan', icon: 'fileText', label: 'Fatura & İrsaliye OCR', sub: 'Belge Girişi' },
+  { id: 'analytics', icon: 'barChart', label: 'Mali Analitik', sub: 'Ciro & Gelir' },
 ]
 
 export default function App() {
   const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+    try { return JSON.parse(localStorage.getItem('kobiflow_user')) } catch { return null }
   })
   const [activeTab, setActiveTab] = useState('dashboard')
   const [selectedBranch, setSelectedBranch] = useState('Tümü')
-  const [isChatOpen, setIsChatOpen] = useState(false)
   const [showNotifs, setShowNotifs] = useState(false)
 
   // Real Persistent Database State
-  const [products, setProducts] = useState(() => loadFromDb(DB_STORAGE_KEY_PRODUCTS, INITIAL_PRODUCTS))
-  const [orders, setOrders] = useState(() => loadFromDb(DB_STORAGE_KEY_ORDERS, INITIAL_ORDERS))
-  const [insights, setInsights] = useState(() => loadFromDb(DB_STORAGE_KEY_INSIGHTS, INITIAL_INSIGHTS))
+  const [products, setProducts] = useState(() => getFromStorage(DB_KEY_PRODUCTS, INITIAL_PRODUCTS))
+  const [orders, setOrders] = useState(() => getFromStorage(DB_KEY_ORDERS, INITIAL_ORDERS))
+  const [insights, setInsights] = useState(() => getFromStorage(DB_KEY_INSIGHTS, INITIAL_INSIGHTS))
 
   useEffect(() => {
-    saveToDb(DB_STORAGE_KEY_PRODUCTS, products)
+    saveToStorage(DB_KEY_PRODUCTS, products)
   }, [products])
 
   useEffect(() => {
-    saveToDb(DB_STORAGE_KEY_ORDERS, orders)
+    saveToStorage(DB_KEY_ORDERS, orders)
   }, [orders])
 
   useEffect(() => {
-    saveToDb(DB_STORAGE_KEY_INSIGHTS, insights)
+    saveToStorage(DB_KEY_INSIGHTS, insights)
   }, [insights])
 
   const handleStockUpdate = (prodId, delta) => {
@@ -1020,18 +921,18 @@ export default function App() {
     setProducts(prev => {
       const updated = [...prev]
       inv.items.forEach(it => {
-        const match = updated.find(p => p.name.toLowerCase().includes('çekirdek') || p.name.toLowerCase().includes('yulaf'))
+        const match = updated.find(p => p.name.toLowerCase().includes('streç') || p.name.toLowerCase().includes('etiket'))
         if (match) {
-          match.stock_quantity += (it.quantity * 10)
+          match.stock_quantity += it.quantity
         } else {
           updated.unshift({
-            id: Math.floor(100 + Math.random() * 900),
+            id: Math.floor(1000 + Math.random() * 9000),
             name: it.name,
-            category: 'Hammadde',
+            category: 'Ticari Malzeme',
             branch: 'Merkez Depo',
             price: it.unit_price,
             stock_quantity: it.quantity,
-            min_stock_threshold: 10
+            min_stock_threshold: 15
           })
         }
       })
@@ -1040,8 +941,7 @@ export default function App() {
   }
 
   const logout = () => {
-    localStorage.removeItem('brewhive_session_token')
-    localStorage.removeItem('user')
+    localStorage.removeItem('kobiflow_user')
     setUser(null)
   }
 
@@ -1057,16 +957,18 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="logo-row">
-            <div className="logo-icon"><Icon name="coffee" size={18} /></div>
+            <div className="logo-icon" style={{ background: 'var(--accent)', color: '#fff' }}>
+              <Icon name="briefcase" size={18} />
+            </div>
             <div className="logo-text">
-              <h1>BrewHive AI</h1>
-              <p>{user.business || 'Specialty Coffee SaaS'}</p>
+              <h1>KobiFlow</h1>
+              <p>{user.business || 'Ticari Operasyon'}</p>
             </div>
           </div>
         </div>
 
         <div className="sidebar-section">
-          <div className="sidebar-section-label">Menü</div>
+          <div className="sidebar-section-label">Yönetim Menüsü</div>
           {VIEWS.map(v => (
             <button
               key={v.id}
@@ -1081,10 +983,10 @@ export default function App() {
 
         <div className="sidebar-footer">
           <div className="user-card">
-            <div className="user-avatar"><Icon name="user" size={14} /></div>
+            <div className="user-avatar" style={{ background: 'var(--accent)' }}><Icon name="user" size={14} /></div>
             <div className="user-info">
-              <p>{user.username || 'Yönetici'}</p>
-              <p>{user.role || 'İşletme Sahibi'}</p>
+              <p>{user.fullName || user.username}</p>
+              <p>{user.role || 'Yönetici'}</p>
             </div>
             <button onClick={logout} className="icon-btn" title="Çıkış">
               <Icon name="power" size={15} />
@@ -1117,10 +1019,11 @@ export default function App() {
                 outline: 'none'
               }}
             >
-              <option value="Tümü">Tüm Şubeler (3 Şube + B2B)</option>
-              <option value="Kadıköy">Kadıköy (Moda)</option>
-              <option value="Beşiktaş">Beşiktaş (Akaretler)</option>
-              <option value="Şişli">Şişli (Bomonti)</option>
+              <option value="Tümü">Tüm Depolar &amp; Şubeler</option>
+              <option value="Merkez Depo">Merkez Depo</option>
+              <option value="Kadıköy Şube">Kadıköy Şube</option>
+              <option value="Levent Şube">Levent Şube</option>
+              <option value="Ankara Şube">Ankara Dağıtım</option>
             </select>
 
             {/* Notification Bell */}
@@ -1134,7 +1037,7 @@ export default function App() {
 
             <div className="status-pill">
               <div className="status-dot" style={{ background: 'var(--green)' }} />
-              Veritabanı Aktif
+              Veritabanı Bağlı
             </div>
           </div>
         </header>
@@ -1147,14 +1050,6 @@ export default function App() {
             onQuickStockAdd={(id, delta) => handleStockUpdate(id, delta)}
           />
         )}
-        {activeTab === 'analytics' && <Analytics />}
-        {activeTab === 'orders' && (
-          <Orders
-            orders={orders}
-            onStatusChange={handleStatusChange}
-            onNewOrder={handleNewOrder}
-          />
-        )}
         {activeTab === 'products' && (
           <Products
             products={products}
@@ -1163,81 +1058,16 @@ export default function App() {
             onDeleteProduct={handleDeleteProduct}
           />
         )}
+        {activeTab === 'orders' && (
+          <Orders
+            orders={orders}
+            onStatusChange={handleStatusChange}
+            onNewOrder={handleNewOrder}
+          />
+        )}
         {activeTab === 'scan' && <SmartScan onAddProductsFromInvoice={handleAddProductsFromInvoice} />}
+        {activeTab === 'analytics' && <Analytics />}
       </div>
-
-      {/* Floating AI Chat Assistant */}
-      <button
-        onClick={() => setIsChatOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--accent), #b45309)',
-          border: '1px solid var(--accent-border)',
-          color: '#fff',
-          boxShadow: '0 8px 24px rgba(217,119,6,0.35)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 40
-        }}
-        title="BrewHive AI Co-Pilot"
-      >
-        <Icon name="bot" size={22} />
-      </button>
-
-      {/* AI Drawer Modal */}
-      {isChatOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.65)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 100,
-            display: 'flex',
-            justifyContent: 'flex-end'
-          }}
-          onClick={() => setIsChatOpen(false)}
-        >
-          <div
-            style={{
-              width: 440,
-              maxWidth: '90vw',
-              height: '100%',
-              background: 'var(--bg-1)',
-              borderLeft: '1px solid var(--border-2)',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: 'var(--shadow-lg)'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 'var(--r)', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="bot" size={16} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>BrewHive AI Co-Pilot</h4>
-                  <p style={{ fontSize: 10, color: 'var(--green)' }}>● Çevrimiçi · Veritabanı Danışmanı</p>
-                </div>
-              </div>
-              <button className="icon-btn" onClick={() => setIsChatOpen(false)}>
-                <Icon name="close" size={16} />
-              </button>
-            </div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <Chat products={products} orders={orders} />
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
