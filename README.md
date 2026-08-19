@@ -4,7 +4,7 @@
 
 [![Google Hackathon](https://img.shields.io/badge/Google%20AI%20Hackathon-Finalist%20Award-gold?style=for-the-badge&logo=google&logoColor=white)](https://kobiflow-app.vercel.app)
 [![Live App](https://img.shields.io/badge/Canl%C4%B1%20Uygulama-kobiflow--app.vercel.app-1e40af?style=for-the-badge&logo=vercel&logoColor=white)](https://kobiflow-app.vercel.app)
-[![Tech Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20React%20%7C%20Gemini%20OCR%20%7C%20SQLite-0284c7?style=for-the-badge)](https://kobiflow-app.vercel.app)
+[![Tech Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20React%20%7C%20NVIDIA%20Vision%20OCR%20%7C%20SQLite-0284c7?style=for-the-badge)](https://kobiflow-app.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 <p align="center">
@@ -30,7 +30,7 @@
 | 📊 **Genel Bakış (Dashboard)** | Günlük/haftalık toplam ticari hacim, bekleyen sevkiyatlar, kritik stok uyarıları ve şube dağılım grafikleri. |
 | 🏢 **Envanter & Stok Yönetimi** | Malzeme ve ürünlerin depo bazlı (Merkez Depo, Kadıköy, Levent, Ankara) stok takibi, yeni ürün ekleme, silme ve hızlı stok güncelleme (+10, +50, -5). |
 | 📦 **Sipariş & Sevkiyat Takibi** | Kurumsal müşterilerden gelen siparişler, sevkiyat durumları (Onay Bekliyor, Sevkiyatta, Teslim Edildi) ve kargo takip yönetimi. |
-| 🧾 **Fatura & İrsaliye OCR** | Tedarikçilerden gelen basılı veya dijital faturaları yükleyip kalemleri otomatik ayrıştırarak tek tıkla stoğa işleme. |
+| 🧾 **Fatura & İrsaliye OCR** | Tedarikçilerden gelen basılı veya dijital faturaları yükleyip kalemleri otomatik ayrıştırarak tek tıkla stoğa işleme. Görüntü doğrudan NVIDIA NIM vision modeline gönderilir; `pytesseract` yalnızca opsiyonel yedek yoldur. |
 | 📈 **Mali Analitik** | Kategori bazlı satış hacmi yüzdeleri ve en çok satan ürünlerin detaylı raporlaması. |
 
 ---
@@ -51,9 +51,27 @@ cd backend
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
+cp ../.env.example .env      # NVIDIA_API_KEY ve JWT_SECRET doldurulmalı
 python main.py
 # ➔ API http://localhost:8000 adresinde ayağa kalkar
 ```
+
+Alternatif olarak proje kökündeki `baslat.bat` her iki servisi de tek seferde ayağa kaldırır.
+Demo giriş bilgileri: `admin` / `admin123`.
+
+---
+
+## ⚠️ Canlı Demo ile Yerel Kurulum Arasındaki Fark
+
+Bu depoda **iki farklı çalışma modu** bulunmaktadır:
+
+| | Canlı demo (`kobiflow-app.vercel.app`) | Yerel tam kurulum |
+| :--- | :--- | :--- |
+| Veri kaynağı | `frontend/src/mockData.js` — sabit örnek veri | FastAPI + SQLite (`kobi.db`) |
+| Ağ isteği | Standalone UI | `http://localhost:8000` |
+| OCR / AI | UI simülasyonu | NVIDIA NIM üzerinden aktif |
+
+Vercel dağıtımı `frontend/` dizini üzerinden `kobiflow-app` projesiyle gerçekleştirilmektedir.
 
 ---
 
